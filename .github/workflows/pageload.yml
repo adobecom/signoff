@@ -26,7 +26,7 @@ jobs:
         os: [ubuntu-latest]
         include:
           - os: ubuntu-latest
-            browser: chrome
+            browser: chromium
        
     name: Smoke Test
     runs-on: ${{ matrix.os }}
