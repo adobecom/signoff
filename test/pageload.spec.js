@@ -10,7 +10,11 @@ test.use({
 
 test.describe.configure({ mode: 'parallel' });
 
-const links = yaml.load(fs.readFileSync('urls.yml', 'utf8'));
+let links = yaml.load(fs.readFileSync('urls.yml', 'utf8'));
+
+if (process.env.environment === 'stage') {
+  links = links.map(link => link.replace('https://www.', 'https://www.stage.'));
+}
 
 const testPageLoad = async ({page}, testInfo) => { 
     test.setTimeout(180000);
