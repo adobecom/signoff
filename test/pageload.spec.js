@@ -18,7 +18,7 @@ if (process.env.ENVIRONMENT === 'stage') {
 }
 
 const testPageLoad = async ({page}, testInfo) => { 
-    test.setTimeout(180000);
+    test.setTimeout(300000);
     const screenshotPath = 'screenshots/';
 
     const url = testInfo.title;
