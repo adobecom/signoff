@@ -12,8 +12,9 @@ test.describe.configure({ mode: 'parallel' });
 
 let links = yaml.load(fs.readFileSync('urls.yml', 'utf8'));
 
-if (process.env.environment === 'stage') {
+if (process.env.ENVIRONMENT === 'stage') {
   links = links.map(link => link.replace('https://www.', 'https://www.stage.'));
+  links = links.map(link => link.replace('https://business.', 'https://business.stage.'));
 }
 
 const testPageLoad = async ({page}, testInfo) => { 
@@ -68,6 +69,10 @@ const testPageLoad = async ({page}, testInfo) => {
         console.log(e.message);
         const message = `999 ${hrefs[i]} no errorcode, offline?`;
         output.push(message);
+      }
+      if (process.env.REQUEST_DELAY) {
+        const delay = parseInt(process.env.REQUEST_DELAY);
+        await page.waitForTimeout(delay);
       }
     }
 
