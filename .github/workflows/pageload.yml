@@ -23,12 +23,12 @@ on:
       workers:
         description: 'Number of test workers'
         required: true
-        default: '5'
+        default: '3'
         type: string
       delay:
         description: 'Delay between requests (ms)'
         required: true
-        default: '1000'
+        default: '0'
         type: string
 
 jobs:
