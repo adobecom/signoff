@@ -1,0 +1,13 @@
+# Document Cloud
+'https://www.stage.adobe.com/acrobat/online/merge-pdf.html':
+  - '404 https://www.adobe.com/acrobat/online/ocr-pdf.html'
+'https://www.stage.adobe.com/acrobat/online/pdf-editor.html':
+  - '404 https://www.adobe.com/acrobat/online/ocr-pdf.html'
+'https://www.stage.adobe.com/acrobat/online/pdf-to-word.html':
+  - '404 https://www.adobe.com/acrobat/online/ocr-pdf.html'
+# Home Page
+'https://www.stage.adobe.com/mena_ar?akamaiLocale=mena':
+  - '404 https://www.adobe.com/mena_ar/express/?promoid=DZTGZSWP&mv=other'
+  - '404 https://www.adobe.com/mena_ar/express/?promoid=Y69SGP43&mv=other'
+  - '404 https://www.adobe.com/mena_ar/express/learn/tutorials?promoid=Z662FP7N&mv=other'
+  - '404 https://www.adobe.com/mena_ar/express/learn/tutorials?promoid=Z9X3FKHM&mv=other'

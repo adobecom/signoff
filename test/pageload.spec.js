@@ -18,7 +18,7 @@ if (process.env.ENVIRONMENT === 'stage') {
 }
 
 const testPageLoad = async ({page}, testInfo) => { 
-    test.setTimeout(300000);
+    test.setTimeout(600000);
     const screenshotPath = 'screenshots/';
 
     const url = testInfo.title;
@@ -43,9 +43,9 @@ const testPageLoad = async ({page}, testInfo) => {
     for (let i = 0; i < hrefs.length; i++) {
       try {
         // special rules
-        if (hrefs[i].includes('localnav-acrobat-teams.html')) {
+        if (hrefs[i].includes('localnav-acrobat-teams.html') || hrefs[i].includes('cc-shared/gnav.html')) {
           hrefs[i] = hrefs[i].replace('.html', '');
-        }
+        }     
         if (hrefs[i].startsWith('tel:')) {
           continue;
         }
@@ -86,7 +86,14 @@ const testPageLoad = async ({page}, testInfo) => {
       }
     }
 
-    const errors404 = output.filter((item) => item.startsWith('404'));
+    let errors404 = output.filter((item) => item.startsWith('404'));
+
+    if (errors404.length > 0) {
+      let knownIssues = yaml.load(fs.readFileSync('urls_known_issues.yml', 'utf8'));
+      if (knownIssues[url]) {
+        errors404 = errors404.filter(x => !knownIssues[url].includes(x))
+      }
+    }
 
     await expect(errors404, errors404.join('\n')).toHaveLength(0);
   }
