@@ -52,7 +52,7 @@ const testPageLoad = async ({page}, testInfo) => {
         
         let response = await page.goto(hrefs[i]);
         if (response === null) {
-          response = await page.waitForResponse(() => true);
+          response = await page.waitForResponse(() => true, { timeout: 10000 });
         }
   
         for (
