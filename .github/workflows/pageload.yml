@@ -30,6 +30,10 @@ on:
         required: true
         default: '0'
         type: string
+      gist_urls:
+        description: 'Gist ID of Input URLs'
+        required: false
+        type: string        
 
 jobs:
   run-tests-gha:
@@ -115,6 +119,7 @@ jobs:
         run: npx playwright test --workers ${{ inputs.workers }}
         env:
           ENVIRONMENT: ${{ inputs.environment }}
+          GIST_URLS: ${{ inputs.gist_urls }}
           REQUEST_DELAY: ${{ inputs.delay }}
           USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
 
