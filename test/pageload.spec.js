@@ -43,10 +43,8 @@ const testPageLoad = async ({page}, testInfo) => {
     for (let i = 0; i < hrefs.length; i++) {
       try {
         // special rules
-        if (hrefs[i].includes('localnav-acrobat-teams.html') || hrefs[i].includes('cc-shared/gnav.html')) {
-          hrefs[i] = hrefs[i].replace('.html', '');
-        }     
-        if (hrefs[i].startsWith('tel:')) {
+        const url = new URL(hrefs[i]);
+        if (hrefs[i].startsWith('tel:') || url.hash === '#open-jarvis-chat') {
           continue;
         }
         
