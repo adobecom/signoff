@@ -81,6 +81,7 @@ jobs:
       - name: Run the tests
         run: npx playwright test --workers ${{ inputs.workers }}
         env:
+          GIST_URLS: ${{ inputs.gist_urls }}
           REQUEST_DELAY: ${{ inputs.delay }}
           USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
 
