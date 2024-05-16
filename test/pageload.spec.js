@@ -96,7 +96,7 @@ const testPageLoad = async ({ page }, testInfo) => {
 
   const errors999 = output.filter((item) => item.startsWith("999"));
   if (errors999.length > 0) {
-    console.log("\n999 errors:");
+    console.log(`\nURL: ${url}`);
     for (let i = 0; i < errors999.length; i++) {
       console.log(errors999[i]);
     }
