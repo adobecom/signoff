@@ -3,6 +3,10 @@ const yaml = require("js-yaml");
 const fetch = require("sync-fetch");
 import { test, expect } from "@playwright/test";
 
+function escapeRegExp(string) {
+  return string.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+}
+
 test.use({
   contextOptions: {
     userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 ${process.env.USER_AGENT_SUFFIX}`,
@@ -104,12 +108,13 @@ const testPageLoad = async ({ page }, testInfo) => {
 
   let errors404 = output.filter((item) => item.startsWith("404"));
 
-  if (errors404.length > 0) {
+  if (errors404.length > 0 && fs.existsSync('urls_known_issues.yml')) {
     let knownIssues = yaml.load(
       fs.readFileSync("urls_known_issues.yml", "utf8")
     );
     if (knownIssues[url]) {
-      errors404 = errors404.filter((x) => !knownIssues[url].includes(x));
+      knownIssues = knownIssues[url].map(x => new RegExp('^' + escapeRegExp(x).replace(/\*/g, '.*') + '$'));
+      errors404 = errors404.filter(x => !knownIssues.some(i => i.test(x)));
     }
   }
 
