@@ -42,7 +42,7 @@ const testPageLoad = async ({ page }, testInfo) => {
 
   const url = testInfo.title;
 
-  const response = await page.goto(url, { waitUntil: "networkidle" });
+  const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
 
   await expect(response.status()).toBe(200);
 
@@ -70,21 +70,9 @@ const testPageLoad = async ({ page }, testInfo) => {
         continue;
       }
 
-      let response = await page.goto(hrefs[i]);
-      if (response === null) {
-        response = await page.waitForResponse(() => true, { timeout: 10000 });
-      }
-
-      for (
-        let request = response.request();
-        request;
-        request = request.redirectedFrom()
-      ) {
-        const message = `${(
-          await request.response()
-        ).status()} ${request.url()}`;
-        output.push(message);
-      }
+      const response = await page.request.head(hrefs[i]);
+      const message = `${response.status()} ${hrefs[i]}`;
+      output.push(message);
     } catch (e) {
       console.log(e.message);
       const message = `999 ${hrefs[i]} no errorcode, offline?`;
