@@ -72,6 +72,12 @@ const testPageLoad = async ({ page }, testInfo) => {
     await delay(1000); // Wait a bit longer at the bottom for any final loading
   });
 
+  // Take a full page screenshot after scrolling
+  await page.screenshot({ 
+    path: `${screenshotPath}/${screenshotName}_fullpage.png`, 
+    fullPage: true 
+  });
+
   const allHrefs = await page.evaluate(() => {
     return Array.from(document.links).map((item) => item.href);
   });
