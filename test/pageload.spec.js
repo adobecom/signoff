@@ -55,6 +55,23 @@ const testPageLoad = async ({ page }, testInfo) => {
     .toLowerCase();
   await page.screenshot({ path: `${screenshotPath}/${screenshotName}.png` });
 
+  // Scroll to the bottom slowly to load any dynamic content
+  await page.evaluate(async () => {
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const scrollHeight = document.body.scrollHeight;
+    const viewportHeight = window.innerHeight;
+    const scrollStep = viewportHeight / 2; // Scroll by half viewport height each time
+    
+    for (let scrollTop = 0; scrollTop < scrollHeight; scrollTop += scrollStep) {
+      window.scrollTo(0, scrollTop);
+      await delay(500); // Wait 500ms between scrolls
+    }
+    
+    // Scroll to the very bottom
+    window.scrollTo(0, scrollHeight);
+    await delay(1000); // Wait a bit longer at the bottom for any final loading
+  });
+
   const allHrefs = await page.evaluate(() => {
     return Array.from(document.links).map((item) => item.href);
   });
