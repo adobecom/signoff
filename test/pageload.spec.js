@@ -72,6 +72,11 @@ const testPageLoad = async ({ page }, testInfo) => {
     await delay(1000); // Wait a bit longer at the bottom for any final loading
   });
 
+  // Move viewport back to the top before taking full page screenshot
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
+
   // Take a full page screenshot after scrolling
   await page.screenshot({ 
     path: `${screenshotPath}/${screenshotName}_fullpage.png`, 
