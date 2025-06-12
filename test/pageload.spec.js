@@ -22,7 +22,8 @@ if (process.env.GIST_URLS) {
   const response = fetch(`https://api.github.com/gists/${gistId}`).json();
   links = Object.values(response.files)[0]
     .content.split("\n")
-    .map((x) => x.trim());
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0 && !x.startsWith("#"));
 } else {
   links = yaml.load(fs.readFileSync("urls.yml", "utf8"));
 }
