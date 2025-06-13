@@ -18,12 +18,21 @@ test.describe.configure({ mode: "parallel" });
 let links = null;
 
 if (process.env.GIST_URLS) {
-  const gistId = process.env.GIST_URLS;
-  const response = fetch(`https://api.github.com/gists/${gistId}`).json();
-  links = Object.values(response.files)[0]
-    .content.split("\n")
-    .map((x) => x.trim())
-    .filter((x) => x.length > 0 && !x.startsWith("#"));
+  const gistUrls = process.env.GIST_URLS;
+  
+  // Check if the input is a URL format
+  if (gistUrls.startsWith('http://') || gistUrls.startsWith('https://')) {
+    // Single URL input
+    links = [gistUrls];
+  } else {
+    // Gist ID input
+    const gistId = gistUrls;
+    const response = fetch(`https://api.github.com/gists/${gistId}`).json();
+    links = Object.values(response.files)[0]
+      .content.split("\n")
+      .map((x) => x.trim())
+      .filter((x) => x.length > 0 && !x.startsWith("#"));
+  }
 } else {
   links = yaml.load(fs.readFileSync("urls.yml", "utf8"));
 }
