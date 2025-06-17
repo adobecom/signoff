@@ -677,9 +677,6 @@ hostsHack: "1.2.3.4 example.com" # Optional hosts file override</div>
                   const emoji = status === 'success' ? '✅' : 
                               status === 'failure' ? '❌' : '⏳';
                   
-                  // Check if screenshots would be available (completed pageload tests)
-                  const hasScreenshots = run.type === 'pageload' && (status === 'success' || status === 'failure');
-                  
                   return `
                       <div class="test-result ${statusClass}">
                           <div class="test-meta">
@@ -698,11 +695,6 @@ hostsHack: "1.2.3.4 example.com" # Optional hosts file override</div>
                           
                           <div style="margin-top: 1rem;">
                               <a href="${run.html_url}" class="btn" target="_blank">View Run Details</a>
-                              ${hasScreenshots ? `
-                                  <button class="btn btn-secondary" onclick="openArtifacts('${run.html_url}', '${repoOwner}', '${repoName}', ${run.id})">
-                                      📸 Get Screenshots
-                                  </button>
-                              ` : ''}
                           </div>
                       </div>
                   `;
@@ -724,23 +716,7 @@ hostsHack: "1.2.3.4 example.com" # Optional hosts file override</div>
               showTab('results');
               setTimeout(loadTestResults, 500);
           }
-          
-          // Function to help users access artifacts/screenshots
-          function openArtifacts(runUrl, owner, repo, runId) {
-              // Show a helpful modal/alert about how to access screenshots
-              const message = `To access the screenshots from this test run:
-              
-1. Click "OK" to open the GitHub Actions run page
-2. Scroll down to the "Artifacts" section at the bottom
-3. Click on "screenshots" to download the ZIP file
-4. The ZIP contains all page screenshots from the test
 
-Note: You need to be logged into GitHub to download artifacts.`;
-              
-              if (confirm(message)) {
-                  window.open(runUrl, '_blank');
-              }
-          }
     </script>
 </body>
 </html> 
