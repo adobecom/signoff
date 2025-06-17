@@ -1,0 +1,31 @@
+name: Daily Tests
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch: 
+
+jobs:
+  dispatch-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Page Load Test
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pageload.yml',
+              ref: 'main',
+              inputs: {
+                testCodeBranch: 'main',
+                environment: 'prod',
+                workers: '3',
+                delay: '0',
+                gist_urls: 'dc/pageload/urls.yml'
+              }
+            })
+      
+      - name: Log dispatch success
+        run: echo "Successfully dispatched pageload.yml workflow" 

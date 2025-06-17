@@ -24,6 +24,9 @@ if (process.env.GIST_URLS) {
   if (gistUrls.startsWith('http://') || gistUrls.startsWith('https://')) {
     // Single URL input
     links = [gistUrls];
+  } else if (gistUrls.endsWith('.yml')) {
+    // YAML file from repository checkout
+    links = yaml.load(fs.readFileSync(gistUrls, "utf8"));
   } else {
     // Gist ID input
     const gistId = gistUrls;
