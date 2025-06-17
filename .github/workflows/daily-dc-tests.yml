@@ -1,4 +1,4 @@
-name: Daily Tests
+name: Daily DC Tests
 
 on:
   schedule:
