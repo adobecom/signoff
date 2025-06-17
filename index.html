@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signoff - Page Load Testing Framework</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+        
+        .header h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .nav {
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            padding: 0;
+        }
+        
+        .nav-list {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .nav-item {
+            flex: 1;
+        }
+        
+        .nav-link {
+            display: block;
+            padding: 1rem;
+            text-decoration: none;
+            color: #495057;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: white;
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-content {
+            padding: 2rem;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .code-block {
+            background: #f1f3f4;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.3s ease;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+        }
+        
+        .btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .workflow-steps {
+            counter-reset: step-counter;
+        }
+        
+        .workflow-step {
+            counter-increment: step-counter;
+            position: relative;
+            padding-left: 3rem;
+            margin-bottom: 2rem;
+        }
+        
+        .workflow-step::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 2rem;
+            height: 2rem;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Signoff</h1>
+            <p>A comprehensive Playwright-based testing framework for web page load performance, visual regression, and link validation</p>
+        </div>
+        
+        <div class="content">
+            <nav class="nav">
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-tab="overview">Overview</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-tab="features">Features</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-tab="usage">Usage</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-tab="workflow">GitHub Actions</a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div id="overview" class="tab-content active">
+                <h2>What is Signoff?</h2>
+                <p>Signoff is a robust testing framework built with Playwright that ensures your web pages load correctly, perform well, and maintain quality across deployments. It's designed for continuous integration and supports both production and staging environments.</p>
+                
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-number">⚡</div>
+                        <div class="stat-label">Fast Testing</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">📸</div>
+                        <div class="stat-label">Visual Regression</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">🔗</div>
+                        <div class="stat-label">Link Validation</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">🚀</div>
+                        <div class="stat-label">CI/CD Ready</div>
+                    </div>
+                </div>
+                
+                <h3>Key Capabilities</h3>
+                <ul style="margin: 1rem 0; padding-left: 2rem;">
+                    <li>Page load performance testing with network idle detection</li>
+                    <li>Automatic screenshot generation for visual regression testing</li>
+                    <li>Comprehensive link validation (finds 404s and broken links)</li>
+                    <li>Support for both production and staging environments</li>
+                    <li>GitHub Actions integration for automated testing</li>
+                    <li>Configurable test workers and request delays</li>
+                    <li>Known issues management via YAML configuration</li>
+                </ul>
+                
+                <div style="margin-top: 2rem;">
+                    <a href="https://github.com/your-username/signoff" class="btn">View on GitHub</a>
+                    <a href="#usage" class="btn btn-secondary" onclick="showTab('usage')">Get Started</a>
+                </div>
+            </div>
+            
+            <div id="features" class="tab-content">
+                <h2>Features</h2>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>🎯 Page Load Testing</h3>
+                        <p>Tests page loading with network idle detection, ensuring all resources are fully loaded before validation.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>📷 Screenshot Capture</h3>
+                        <p>Automatically captures both standard and full-page screenshots for visual regression testing.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🔍 Link Validation</h3>
+                        <p>Crawls all links on each page and validates them, reporting 404s and connection issues.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🌍 Multi-Environment</h3>
+                        <p>Supports testing across production and staging environments with automatic URL transformation.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>⚙️ Configurable Testing</h3>
+                        <p>Flexible configuration for test workers, request delays, and URL sources (files or GitHub Gists).</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🤖 CI/CD Integration</h3>
+                        <p>Built-in GitHub Actions workflows with support for self-hosted runners and manual triggers.</p>
+                    </div>
+                </div>
+                
+                <h3>Advanced Features</h3>
+                <ul style="margin: 1rem 0; padding-left: 2rem;">
+                    <li><strong>Dynamic Content Loading:</strong> Scrolls through pages to trigger lazy-loading content</li>
+                    <li><strong>Custom User Agents:</strong> Configurable user agent strings for testing</li>
+                    <li><strong>Known Issues Management:</strong> YAML-based exclusion of known broken links</li>
+                    <li><strong>Parallel Execution:</strong> Configurable worker threads for faster testing</li>
+                    <li><strong>Artifact Collection:</strong> Automatic collection of screenshots and test results</li>
+                </ul>
+            </div>
+            
+            <div id="usage" class="tab-content">
+                <h2>Getting Started</h2>
+                
+                <h3>Installation</h3>
+                <div class="code-block">npm install</div>
+                
+                <h3>Basic Usage</h3>
+                <p>1. Configure your test URLs in <code>urls.yml</code>:</p>
+                <div class="code-block">- https://example.com
+- https://example.com/about
+- https://example.com/contact</div>
+                
+                <p>2. Run the tests locally:</p>
+                <div class="code-block">npm test</div>
+                
+                <p>3. Run with custom workers:</p>
+                <div class="code-block">npx playwright test --workers 3</div>
+                
+                <h3>Configuration Options</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>Environment Variables</h4>
+                        <ul>
+                            <li><code>GIST_URLS</code> - GitHub Gist ID or direct URL</li>
+                            <li><code>ENVIRONMENT</code> - 'prod' or 'stage'</li>
+                            <li><code>REQUEST_DELAY</code> - Delay between requests (ms)</li>
+                            <li><code>USER_AGENT_SUFFIX</code> - Custom user agent suffix</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h4>Files</h4>
+                        <ul>
+                            <li><code>urls.yml</code> - List of URLs to test</li>
+                            <li><code>urls_known_issues.yml</code> - Known broken links to ignore</li>
+                            <li><code>screenshots/</code> - Generated screenshots directory</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h3>Integration Testing</h3>
+                <p>For visual component testing:</p>
+                <div class="code-block">npm run int</div>
+                
+                <p>Watch mode for development:</p>
+                <div class="code-block">npm run int:file:watch</div>
+            </div>
+            
+            <div id="workflow" class="tab-content">
+                <h2>GitHub Actions Integration</h2>
+                
+                <p>Signoff includes a comprehensive GitHub Actions workflow for automated testing. The workflow supports both GitHub-hosted and self-hosted runners.</p>
+                
+                <h3>Workflow Features</h3>
+                <div class="workflow-steps">
+                    <div class="workflow-step">
+                        <h4>Manual Triggers</h4>
+                        <p>Trigger tests manually with custom parameters including test branch, environment, worker count, and request delays.</p>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Environment Support</h4>
+                        <p>Automatic routing to GitHub-hosted runners for production and self-hosted runners for staging environments.</p>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Browser Installation</h4>
+                        <p>Automatic Playwright browser installation with dependency management and caching.</p>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Artifact Collection</h4>
+                        <p>Automatic collection and upload of screenshots and test results for analysis.</p>
+                    </div>
+                </div>
+                
+                <h3>Workflow Parameters</h3>
+                <div class="code-block">testCodeBranch: main          # Test code branch
+environment: prod             # prod or stage  
+workers: 3                   # Number of test workers
+delay: 0                     # Delay between requests (ms)
+gist_urls: abc123            # Gist ID for URL list
+hostsHack: "1.2.3.4 example.com" # Optional hosts file override</div>
+                
+                <h3>Running the Workflow</h3>
+                <ol style="margin: 1rem 0; padding-left: 2rem;">
+                    <li>Go to your repository's Actions tab</li>
+                    <li>Select "Test Page Load" workflow</li>
+                    <li>Click "Run workflow"</li>
+                    <li>Configure parameters as needed</li>
+                    <li>View results and download artifacts</li>
+                </ol>
+                
+                <div style="margin-top: 2rem;">
+                    <a href="https://github.com/your-username/signoff/actions" class="btn">View Actions</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab switching functionality
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabName = link.getAttribute('data-tab');
+                showTab(tabName);
+            });
+        });
+        
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to selected nav link
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        }
+        
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

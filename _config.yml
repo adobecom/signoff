@@ -1,0 +1,32 @@
+# GitHub Pages configuration for Signoff
+title: "Signoff - Page Load Testing Framework"
+description: "A comprehensive Playwright-based testing framework for web page load performance, visual regression, and link validation"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+theme: minima
+
+# GitHub Pages settings
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+
+# Exclude files from processing
+exclude:
+  - node_modules
+  - package.json
+  - package-lock.json
+  - test/
+  - screenshots/
+  - test-results/
+  - wtr/
+  - "*.spec.js"
+  - "*.config.mjs"
+  - "*.yml"
+  - LICENSE
+  - README.md
+
+# Include files that would normally be excluded
+include:
+  - _pages 
