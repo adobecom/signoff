@@ -104,6 +104,20 @@ jobs:
               return
             }
             
+            // Download test-results artifact if it exists
+            const testResultsArtifact = artifacts.data.artifacts.find(a => a.name === 'test-results')
+            if (testResultsArtifact) {
+              const download = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: testResultsArtifact.id,
+                archive_format: 'zip'
+              })
+              
+              fs.writeFileSync('test-results.zip', Buffer.from(download.data))
+              console.log('Downloaded test-results artifact')
+            }
+            
             // Download screenshots artifact if it exists
             const screenshotArtifact = artifacts.data.artifacts.find(a => a.name === 'screenshots')
             if (screenshotArtifact) {
@@ -120,6 +134,11 @@ jobs:
 
       - name: Extract artifacts and analyze results
         run: |
+          if [ -f test-results.zip ]; then
+            unzip -q test-results.zip -d extracted_test_results/ || true
+            echo "Extracted test results"
+            ls -la extracted_test_results/ || true
+          fi
           if [ -f screenshots.zip ]; then
             unzip -q screenshots.zip -d extracted_screenshots/ || true
             echo "Extracted screenshots"
@@ -133,13 +152,7 @@ jobs:
           script: |
             const workflowResult = ${{ steps.wait.outputs.result }}
             const fs = require('fs')
-            
-            // Get workflow run jobs
-            const jobs = await github.rest.actions.listJobsForWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: workflowResult.id
-            })
+            const path = require('path')
             
             let testResults = {
               status: workflowResult.conclusion,
@@ -147,48 +160,39 @@ jobs:
               endTime: workflowResult.updated_at,
               duration: Math.round((new Date(workflowResult.updated_at) - new Date(workflowResult.created_at)) / 1000 / 60),
               workflowUrl: workflowResult.html_url,
-              jobs: [],
-              screenshots: [],
-              errors: []
+              jsonReport: null
             }
             
-            // Analyze job results
-            for (const job of jobs.data.jobs) {
-              testResults.jobs.push({
-                name: job.name,
-                status: job.conclusion,
-                duration: Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000 / 60)
-              })
-              
-              // Get job logs to extract test details
+            // Try to load JSON test report
+            if (fs.existsSync('extracted_test_results')) {
               try {
-                const logs = await github.rest.actions.downloadJobLogsForWorkflowRun({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  job_id: job.id
-                })
-                
-                const logText = logs.data
-                
-                // Extract error information from logs
-                const errorLines = logText.split('\n').filter(line => 
-                  line.includes('404') || 
-                  line.includes('999') || 
-                  line.includes('Error:') ||
-                  line.includes('Failed')
-                )
-                
-                testResults.errors.push(...errorLines.slice(0, 20)) // Limit to first 20 errors
-                
+                const testResultFiles = fs.readdirSync('extracted_test_results').filter(f => f.startsWith('test-report-') && f.endsWith('.json'))
+                if (testResultFiles.length > 0) {
+                  const reportPath = path.join('extracted_test_results', testResultFiles[0])
+                  const reportData = fs.readFileSync(reportPath, 'utf8')
+                  testResults.jsonReport = JSON.parse(reportData)
+                  console.log('Successfully loaded JSON test report')
+                  console.log(`Report contains ${testResults.jsonReport.totalTests} tests`)
+                }
               } catch (error) {
-                console.log(`Could not retrieve logs for job ${job.id}`)
+                console.log('Could not load JSON test report:', error.message)
               }
             }
             
-            // Check for screenshots
-            if (fs.existsSync('extracted_screenshots')) {
-              const screenshots = fs.readdirSync('extracted_screenshots').filter(f => f.endsWith('.png'))
-              testResults.screenshots = screenshots.slice(0, 10) // Limit to first 10 screenshots
+            // If no JSON report, fall back to basic workflow info
+            if (!testResults.jsonReport) {
+              console.log('No JSON test report found, using basic workflow info')
+              const jobs = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: workflowResult.id
+              })
+              
+              testResults.jobs = jobs.data.jobs.map(job => ({
+                name: job.name,
+                status: job.conclusion,
+                duration: Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000 / 60)
+              }))
             }
             
             return testResults
@@ -202,16 +206,65 @@ jobs:
             
             // Format the wiki content
             const statusEmoji = testResults.status === 'success' ? '✅' : '❌'
-            const screenshotList = testResults.screenshots.length > 0 ? 
-              `${testResults.screenshots.length} screenshots captured:\n${testResults.screenshots.map(s => `- ${s}`).join('\n')}` : 
-              'No screenshots available'
-            const errorSection = testResults.errors.length > 0 ? 
-              `\`\`\`\n${testResults.errors.slice(0, 15).join('\n')}\n\`\`\`` : 
-              'No errors detected ✅'
-            const jobResults = testResults.jobs.map(job => {
-              const jobEmoji = job.status === 'success' ? '✅' : '❌'
-              return `- **${job.name}**: ${job.status.toUpperCase()} ${jobEmoji} (${job.duration}m)`
-            }).join('\n')
+            
+            let testResultsTable = ''
+            let summarySection = ''
+            
+            if (testResults.jsonReport) {
+              // Create summary from JSON report
+              const report = testResults.jsonReport
+              const successRate = report.summary.successRate || '0%'
+              
+              summarySection = [
+                `- **Total Tests**: ${report.totalTests}`,
+                `- **Passed**: ${report.passedTests} ✅`,
+                `- **Failed**: ${report.failedTests} ❌`,
+                `- **Success Rate**: ${successRate}`,
+                `- **Total URLs**: ${report.summary.totalUrls}`,
+                `- **Total Links Validated**: ${report.summary.totalLinks}`,
+                `- **404 Errors**: ${report.summary.total404Errors}`,
+                `- **999 Errors**: ${report.summary.total999Errors}`
+              ].join('\n')
+              
+              // Create detailed test results table
+              testResultsTable = [
+                '## Test Results Details',
+                '',
+                '| URL | Status | Duration (ms) | Page Load | Total Links | Valid Links | 404 Errors |',
+                '|-----|--------|---------------|-----------|-------------|-------------|------------|'
+              ]
+              
+              for (const test of report.tests.slice(0, 50)) {
+                const statusIcon = test.status === 'passed' ? '✅' : '❌'
+                const url = test.url.length > 50 ? test.url.substring(0, 47) + '...' : test.url
+                const duration = Math.round(test.duration)
+                const pageLoad = test.pageLoadStatus || 'N/A'
+                const totalLinks = test.linkValidation.totalLinks
+                const validLinks = test.linkValidation.validLinks
+                const errors404 = test.linkValidation.errors404.length
+                
+                testResultsTable.push(
+                  `| ${url} | ${test.status.toUpperCase()} ${statusIcon} | ${duration} | ${pageLoad} | ${totalLinks} | ${validLinks} | ${errors404} |`
+                )
+              }
+              
+              if (report.tests.length > 50) {
+                testResultsTable.push(`| ... | ... | ... | ... | ... | ... | ... |`)
+                testResultsTable.push(`| *${report.tests.length - 50} more tests* | | | | | | |`)
+              }
+              
+              testResultsTable = testResultsTable.join('\n')
+            } else {
+              // Fallback for when JSON report is not available
+              summarySection = `- **Status**: ${testResults.status.toUpperCase()} ${statusEmoji}`
+              if (testResults.jobs) {
+                const jobResults = testResults.jobs.map(job => {
+                  const jobEmoji = job.status === 'success' ? '✅' : '❌'
+                  return `- **${job.name}**: ${job.status.toUpperCase()} ${jobEmoji} (${job.duration}m)`
+                }).join('\n')
+                testResultsTable = `## Job Results\n\n${jobResults}`
+              }
+            }
             
             const wikiContent = [
               `# Daily DC Test Results - ${today}`,
@@ -221,15 +274,9 @@ jobs:
               `- **Start Time**: ${new Date(testResults.startTime).toLocaleString()}`,
               `- **Duration**: ${testResults.duration} minutes`,
               `- **Workflow**: [View Details](${testResults.workflowUrl})`,
+              summarySection,
               '',
-              '## Job Results',
-              jobResults,
-              '',
-              '## Screenshots Generated', 
-              screenshotList,
-              '',
-              '## Errors/Issues',
-              errorSection,
+              testResultsTable,
               '',
               '---',
               `*Last updated: ${new Date().toISOString()}*`,
@@ -283,7 +330,7 @@ jobs:
               // Also update the main daily results page
               const mainFileName = 'Daily-DC-Test-Results.md'
               const mainContent = [
-                '# Daily Test Results',
+                '# Daily DC Test Results',
                 '',
                 'This page contains the latest daily test results for the DC tests.',
                 '',
@@ -331,7 +378,7 @@ jobs:
               const issue = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `Daily Test Results - ${today}`,
+                title: `Daily DC Test Results - ${today}`,
                 body: wikiContent,
                 labels: ['test-results', 'daily-report']
               })
@@ -341,5 +388,5 @@ jobs:
 
       - name: Clean up
         run: |
-          rm -f screenshots.zip
-          rm -rf extracted_screenshots/ 
+          rm -f screenshots.zip test-results.zip
+          rm -rf extracted_screenshots/ extracted_test_results/ 
