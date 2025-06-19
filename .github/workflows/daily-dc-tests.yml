@@ -62,11 +62,9 @@ jobs:
         with:
           script: |
             // Determine gist_urls value based on trigger type
-            const eventName = '${{ github.event_name }}';
-            const inputGistUrls = '${{ github.event.inputs.gist_urls }}';
-            const gistUrls = eventName === 'workflow_dispatch' ? inputGistUrls : 'dc/pageload/urls.yml';
-            
-            console.log(`Event: ${eventName}, Using gist_urls: ${gistUrls}`);
+            const gistUrls = '${{ github.event_name }}' === 'workflow_dispatch' 
+              ? '${{ github.event.inputs.gist_urls }}' 
+              : 'dc/pageload/urls.yml'
             
             const response = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
