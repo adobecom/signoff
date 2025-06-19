@@ -163,19 +163,85 @@ jobs:
               jsonReport: null
             }
             
-            // Try to load JSON test report
+            // Try to load and combine multiple JSON test reports
             if (fs.existsSync('extracted_test_results')) {
               try {
                 const testResultFiles = fs.readdirSync('extracted_test_results').filter(f => f.startsWith('test-report-') && f.endsWith('.json'))
+                console.log(`Found ${testResultFiles.length} test report files:`, testResultFiles)
+                
                 if (testResultFiles.length > 0) {
-                  const reportPath = path.join('extracted_test_results', testResultFiles[0])
-                  const reportData = fs.readFileSync(reportPath, 'utf8')
-                  testResults.jsonReport = JSON.parse(reportData)
-                  console.log('Successfully loaded JSON test report')
-                  console.log(`Report contains ${testResults.jsonReport.totalTests} tests`)
+                  // Initialize combined report structure
+                  const combinedReport = {
+                    startTime: null,
+                    endTime: null,
+                    totalTests: 0,
+                    passedTests: 0,
+                    failedTests: 0,
+                    skippedTests: 0,
+                    tests: [],
+                    summary: {
+                      totalUrls: 0,
+                      totalLinks: 0,
+                      total404Errors: 0,
+                      total999Errors: 0,
+                      totalScreenshots: 0,
+                      totalDuration: 0,
+                      successRate: '0%'
+                    }
+                  }
+                  
+                  // Process each report file
+                  for (const fileName of testResultFiles) {
+                    const reportPath = path.join('extracted_test_results', fileName)
+                    const reportData = fs.readFileSync(reportPath, 'utf8')
+                    const report = JSON.parse(reportData)
+                    
+                    console.log(`Processing ${fileName}: ${report.totalTests} tests`)
+                    
+                    // Combine test results
+                    combinedReport.tests.push(...report.tests)
+                    
+                    // Aggregate totals
+                    combinedReport.totalTests += report.totalTests || 0
+                    combinedReport.passedTests += report.passedTests || 0
+                    combinedReport.failedTests += report.failedTests || 0
+                    combinedReport.skippedTests += report.skippedTests || 0
+                    
+                    // Aggregate summary statistics
+                    if (report.summary) {
+                      combinedReport.summary.totalUrls += report.summary.totalUrls || 0
+                      combinedReport.summary.totalLinks += report.summary.totalLinks || 0
+                      combinedReport.summary.total404Errors += report.summary.total404Errors || 0
+                      combinedReport.summary.total999Errors += report.summary.total999Errors || 0
+                      combinedReport.summary.totalScreenshots += report.summary.totalScreenshots || 0
+                      combinedReport.summary.totalDuration += report.summary.totalDuration || 0
+                    }
+                    
+                    // Track earliest start time
+                    if (!combinedReport.startTime || (report.startTime && new Date(report.startTime) < new Date(combinedReport.startTime))) {
+                      combinedReport.startTime = report.startTime
+                    }
+                    
+                    // Track latest end time
+                    if (!combinedReport.endTime || (report.endTime && new Date(report.endTime) > new Date(combinedReport.endTime))) {
+                      combinedReport.endTime = report.endTime
+                    }
+                  }
+                  
+                  // Calculate final success rate
+                  combinedReport.summary.successRate = combinedReport.totalTests > 0 ? 
+                    ((combinedReport.passedTests / combinedReport.totalTests) * 100).toFixed(2) + '%' : '0%'
+                  
+                  // Sort tests by URL for consistent ordering
+                  combinedReport.tests.sort((a, b) => a.url.localeCompare(b.url))
+                  
+                  testResults.jsonReport = combinedReport
+                  console.log('Successfully combined JSON test reports')
+                  console.log(`Combined report contains ${combinedReport.totalTests} tests from ${testResultFiles.length} workers`)
+                  console.log(`Success rate: ${combinedReport.summary.successRate}`)
                 }
               } catch (error) {
-                console.log('Could not load JSON test report:', error.message)
+                console.log('Could not load JSON test reports:', error.message)
               }
             }
             
@@ -236,7 +302,9 @@ jobs:
               
               for (const test of report.tests.slice(0, 50)) {
                 const statusIcon = test.status === 'passed' ? '✅' : '❌'
-                const url = test.url.length > 50 ? test.url.substring(0, 47) + '...' : test.url
+                // Create a clickable link with truncated display text
+                const displayUrl = test.url.length > 50 ? test.url.substring(0, 47) + '...' : test.url
+                const urlLink = `[${displayUrl}](${test.url})`
                 const duration = Math.round(test.duration)
                 const pageLoad = test.pageLoadStatus || 'N/A'
                 const totalLinks = test.linkValidation.totalLinks
@@ -244,7 +312,7 @@ jobs:
                 const errors404 = test.linkValidation.errors404.length
                 
                 testResultsTable.push(
-                  `| ${url} | ${test.status.toUpperCase()} ${statusIcon} | ${duration} | ${pageLoad} | ${totalLinks} | ${validLinks} | ${errors404} |`
+                  `| ${urlLink} | ${statusIcon} | ${duration} | ${pageLoad} | ${totalLinks} | ${validLinks} | ${errors404} |`
                 )
               }
               
