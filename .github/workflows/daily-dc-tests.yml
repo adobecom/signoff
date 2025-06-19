@@ -14,20 +14,58 @@ on:
         options:
           - prod
           - stage
+      gist_urls:
+        description: 'URL source (YAML file path, Gist ID, or direct URL)'
+        required: true
+        default: 'dc/pageload/urls.yml'
+        type: string
 
 jobs:
-  dispatch-and-publish-prod:
+  dispatch-and-publish:
     runs-on: ubuntu-latest
-    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod') || (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *')
+    strategy:
+      matrix:
+        include:
+          - environment: prod
+            schedule_time: '0 7 * * *'
+            wiki_title_suffix: ''
+            wiki_file_suffix: ''
+            environment_emoji: '🏭'
+          - environment: stage
+            schedule_time: '0 8 * * *'
+            wiki_title_suffix: ' (Stage)'
+            wiki_file_suffix: '-Stage'
+            environment_emoji: '🚧'
     steps:
+      - name: Check execution condition
+        id: should_run
+        run: |
+          should_run=false
+          
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.environment }}" == "${{ matrix.environment }}" ]]; then
+            should_run=true
+          elif [[ "${{ github.event_name }}" == "schedule" && "${{ github.event.schedule }}" == "${{ matrix.schedule_time }}" ]]; then
+            should_run=true
+          fi
+          
+          echo "should_run=$should_run" >> $GITHUB_OUTPUT
+          echo "Should run for ${{ matrix.environment }}: $should_run"
+
       - name: Check out repository
+        if: steps.should_run.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: Dispatch Page Load Test
+        if: steps.should_run.outputs.should_run == 'true'
         id: dispatch
         uses: actions/github-script@v7
         with:
           script: |
+            // Determine gist_urls value based on trigger type
+            const gistUrls = '${{ github.event_name }}' === 'workflow_dispatch' 
+              ? '${{ github.event.inputs.gist_urls }}' 
+              : 'dc/pageload/urls.yml'
+            
             const response = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -35,14 +73,14 @@ jobs:
               ref: 'main',
               inputs: {
                 testCodeBranch: 'main',
-                environment: 'prod',
+                environment: '${{ matrix.environment }}',
                 workers: '3',
                 delay: '0',
-                gist_urls: 'dc/pageload/urls.yml'
+                gist_urls: gistUrls
               }
             })
             
-            console.log("Successfully dispatched pageload.yml workflow")
+            console.log("Successfully dispatched pageload.yml workflow for ${{ matrix.environment }} environment")
             return Date.now()
       
       - name: Wait for workflow completion
@@ -97,6 +135,7 @@ jobs:
             }
 
       - name: Download workflow artifacts
+        if: steps.should_run.outputs.should_run == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -144,6 +183,7 @@ jobs:
             }
 
       - name: Extract artifacts and analyze results
+        if: steps.should_run.outputs.should_run == 'true'
         run: |
           if [ -f test-results.zip ]; then
             unzip -q test-results.zip -d extracted_test_results/ || true
@@ -157,6 +197,7 @@ jobs:
           fi
 
       - name: Get workflow logs and create summary
+        if: steps.should_run.outputs.should_run == 'true'
         id: summary
         uses: actions/github-script@v7
         with:
@@ -275,6 +316,7 @@ jobs:
             return testResults
 
       - name: Update Wiki
+        if: steps.should_run.outputs.should_run == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -346,9 +388,10 @@ jobs:
             }
             
             const wikiContent = [
-              `# Daily DC Test Results - ${today}`,
+              `# Daily DC Test Results${{ matrix.wiki_title_suffix }} - ${today}`,
               '',
               '## Test Summary',
+              `- **Environment**: ${{ matrix.environment }}`.toUpperCase() + ` ${{ matrix.environment_emoji }}`,
               `- **Status**: ${testResults.status.toUpperCase()} ${statusEmoji}`,
               `- **Start Time**: ${new Date(testResults.startTime).toLocaleString()}`,
               `- **Duration**: ${testResults.duration} minutes`,
@@ -365,7 +408,7 @@ jobs:
             try {
               // Create or update wiki page by creating a commit to the wiki repository
               const wikiRepo = `${context.repo.repo}.wiki`
-              const fileName = `Daily-DC-Test-Results-${today}.md`
+              const fileName = `Daily-DC-Test-Results${{ matrix.wiki_file_suffix }}-${today}.md`
               
               // Try to get existing file
               let existingFile = null
@@ -380,7 +423,7 @@ jobs:
               }
               
               // Create or update the wiki page
-              const commitMessage = `Update daily test results for ${today}`
+              const commitMessage = `Update daily ${{ matrix.environment }} test results for ${today}`
               const contentBase64 = Buffer.from(wikiContent).toString('base64')
               
               if (existingFile) {
@@ -457,429 +500,17 @@ jobs:
               const issue = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `Daily DC Test Results - ${today}`,
+                title: `Daily DC Test Results${{ matrix.wiki_title_suffix }} - ${today}`,
                 body: wikiContent,
-                labels: ['test-results', 'daily-report']
+                labels: ['test-results', 'daily-report', '${{ matrix.environment }}']
               })
               
               console.log(`Created issue with test results: ${issue.data.html_url}`)
             }
 
       - name: Clean up
+        if: steps.should_run.outputs.should_run == 'true'
         run: |
           rm -f screenshots.zip test-results.zip
           rm -rf extracted_screenshots/ extracted_test_results/
-
-  dispatch-and-publish-stage:
-    runs-on: ubuntu-latest
-    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'stage') || (github.event_name == 'schedule' && github.event.schedule == '0 8 * * *')
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Dispatch Page Load Test
-        id: dispatch
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const response = await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'pageload.yml',
-              ref: 'main',
-              inputs: {
-                testCodeBranch: 'main',
-                environment: 'stage',
-                workers: '3',
-                delay: '0',
-                gist_urls: 'dc/pageload/urls.yml'
-              }
-            })
-            
-            console.log("Successfully dispatched pageload.yml workflow for stage environment")
-            return Date.now()
-      
-      - name: Wait for workflow completion
-        id: wait
-        uses: actions/github-script@v7
-        with:
-          timeout-minutes: 45
-          script: |
-            const dispatchTime = ${{ steps.dispatch.outputs.result }}
-            const maxWaitTime = 45 * 60 * 1000 // 45 minutes
-            const pollInterval = 30 * 1000 // 30 seconds
-            
-            let workflowRun = null
-            let elapsedTime = 0
-            
-            while (elapsedTime < maxWaitTime) {
-              // Get recent workflow runs
-              const runs = await github.rest.actions.listWorkflowRuns({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: 'pageload.yml',
-                per_page: 10
-              })
-              
-              // Find the run we just dispatched
-              const recentRun = runs.data.workflow_runs.find(run => 
-                new Date(run.created_at).getTime() >= dispatchTime &&
-                run.event === 'workflow_dispatch'
-              )
-              
-              if (recentRun && recentRun.status === 'completed') {
-                workflowRun = recentRun
-                break
-              }
-              
-              console.log(`Waiting for workflow to complete... (${Math.round(elapsedTime/1000)}s elapsed)`)
-              await new Promise(resolve => setTimeout(resolve, pollInterval))
-              elapsedTime += pollInterval
-            }
-            
-            if (!workflowRun) {
-              throw new Error('Workflow did not complete within timeout period')
-            }
-            
-            console.log(`Workflow completed with status: ${workflowRun.conclusion}`)
-            return {
-              id: workflowRun.id,
-              conclusion: workflowRun.conclusion,
-              html_url: workflowRun.html_url,
-              created_at: workflowRun.created_at,
-              updated_at: workflowRun.updated_at
-            }
-
-      - name: Download workflow artifacts
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const workflowResult = ${{ steps.wait.outputs.result }}
-            const fs = require('fs')
-            
-            // Get artifacts from the completed workflow
-            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: workflowResult.id
-            })
-            
-            if (artifacts.data.artifacts.length === 0) {
-              console.log('No artifacts found')
-              return
-            }
-            
-            // Download test-results artifact if it exists
-            const testResultsArtifact = artifacts.data.artifacts.find(a => a.name === 'test-results')
-            if (testResultsArtifact) {
-              const download = await github.rest.actions.downloadArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: testResultsArtifact.id,
-                archive_format: 'zip'
-              })
-              
-              fs.writeFileSync('test-results.zip', Buffer.from(download.data))
-              console.log('Downloaded test-results artifact')
-            }
-            
-            // Download screenshots artifact if it exists
-            const screenshotArtifact = artifacts.data.artifacts.find(a => a.name === 'screenshots')
-            if (screenshotArtifact) {
-              const download = await github.rest.actions.downloadArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: screenshotArtifact.id,
-                archive_format: 'zip'
-              })
-              
-              fs.writeFileSync('screenshots.zip', Buffer.from(download.data))
-              console.log('Downloaded screenshots artifact')
-            }
-
-      - name: Extract artifacts and analyze results
-        run: |
-          if [ -f test-results.zip ]; then
-            unzip -q test-results.zip -d extracted_test_results/ || true
-            echo "Extracted test results"
-            ls -la extracted_test_results/ || true
-          fi
-          if [ -f screenshots.zip ]; then
-            unzip -q screenshots.zip -d extracted_screenshots/ || true
-            echo "Extracted screenshots"
-            ls -la extracted_screenshots/ || true
-          fi
-
-      - name: Get workflow logs and create summary
-        id: summary
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const workflowResult = ${{ steps.wait.outputs.result }}
-            const fs = require('fs')
-            const path = require('path')
-            
-            let testResults = {
-              status: workflowResult.conclusion,
-              startTime: workflowResult.created_at,
-              endTime: workflowResult.updated_at,
-              duration: Math.round((new Date(workflowResult.updated_at) - new Date(workflowResult.created_at)) / 1000 / 60),
-              workflowUrl: workflowResult.html_url,
-              jsonReport: null
-            }
-            
-            // Try to load and combine multiple JSON test reports
-            if (fs.existsSync('extracted_test_results')) {
-              try {
-                const testResultFiles = fs.readdirSync('extracted_test_results').filter(f => f.startsWith('test-report-') && f.endsWith('.json'))
-                console.log(`Found ${testResultFiles.length} test report files:`, testResultFiles)
-                
-                if (testResultFiles.length > 0) {
-                  // Initialize combined report structure
-                  const combinedReport = {
-                    startTime: null,
-                    endTime: null,
-                    totalTests: 0,
-                    passedTests: 0,
-                    failedTests: 0,
-                    skippedTests: 0,
-                    tests: [],
-                    summary: {
-                      totalUrls: 0,
-                      totalLinks: 0,
-                      total404Errors: 0,
-                      total999Errors: 0,
-                      totalScreenshots: 0,
-                      totalDuration: 0,
-                      successRate: '0%'
-                    }
-                  }
-                  
-                  // Process each report file
-                  for (const fileName of testResultFiles) {
-                    const reportPath = path.join('extracted_test_results', fileName)
-                    const reportData = fs.readFileSync(reportPath, 'utf8')
-                    const report = JSON.parse(reportData)
-                    
-                    console.log(`Processing ${fileName}: ${report.totalTests} tests`)
-                    
-                    // Combine test results
-                    combinedReport.tests.push(...report.tests)
-                    
-                    // Aggregate totals
-                    combinedReport.totalTests += report.totalTests || 0
-                    combinedReport.passedTests += report.passedTests || 0
-                    combinedReport.failedTests += report.failedTests || 0
-                    combinedReport.skippedTests += report.skippedTests || 0
-                    
-                    // Aggregate summary statistics
-                    if (report.summary) {
-                      combinedReport.summary.totalUrls += report.summary.totalUrls || 0
-                      combinedReport.summary.totalLinks += report.summary.totalLinks || 0
-                      combinedReport.summary.total404Errors += report.summary.total404Errors || 0
-                      combinedReport.summary.total999Errors += report.summary.total999Errors || 0
-                      combinedReport.summary.totalScreenshots += report.summary.totalScreenshots || 0
-                      combinedReport.summary.totalDuration += report.summary.totalDuration || 0
-                    }
-                    
-                    // Track earliest start time
-                    if (!combinedReport.startTime || (report.startTime && new Date(report.startTime) < new Date(combinedReport.startTime))) {
-                      combinedReport.startTime = report.startTime
-                    }
-                    
-                    // Track latest end time
-                    if (!combinedReport.endTime || (report.endTime && new Date(report.endTime) > new Date(combinedReport.endTime))) {
-                      combinedReport.endTime = report.endTime
-                    }
-                  }
-                  
-                  // Calculate final success rate
-                  combinedReport.summary.successRate = combinedReport.totalTests > 0 ? 
-                    ((combinedReport.passedTests / combinedReport.totalTests) * 100).toFixed(2) + '%' : '0%'
-                  
-                  // Sort tests by URL for consistent ordering
-                  combinedReport.tests.sort((a, b) => a.url.localeCompare(b.url))
-                  
-                  testResults.jsonReport = combinedReport
-                  console.log('Successfully combined JSON test reports')
-                  console.log(`Combined report contains ${combinedReport.totalTests} tests from ${testResultFiles.length} workers`)
-                  console.log(`Success rate: ${combinedReport.summary.successRate}`)
-                }
-              } catch (error) {
-                console.log('Could not load JSON test reports:', error.message)
-              }
-            }
-            
-            // If no JSON report, fall back to basic workflow info
-            if (!testResults.jsonReport) {
-              console.log('No JSON test report found, using basic workflow info')
-              const jobs = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: workflowResult.id
-              })
-              
-              testResults.jobs = jobs.data.jobs.map(job => ({
-                name: job.name,
-                status: job.conclusion,
-                duration: Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000 / 60)
-              }))
-            }
-            
-            return testResults
-
-      - name: Update Wiki
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const testResults = ${{ steps.summary.outputs.result }}
-            const today = new Date().toISOString().split('T')[0]
-            
-            // Format the wiki content
-            const statusEmoji = testResults.status === 'success' ? '✅' : '❌'
-            
-            let testResultsTable = ''
-            let summarySection = ''
-            
-            if (testResults.jsonReport) {
-              // Create summary from JSON report
-              const report = testResults.jsonReport
-              const successRate = report.summary.successRate || '0%'
-              
-              summarySection = [
-                `- **Total Tests**: ${report.totalTests}`,
-                `- **Passed**: ${report.passedTests} ✅`,
-                `- **Failed**: ${report.failedTests} ❌`,
-                `- **Success Rate**: ${successRate}`,
-                `- **Total URLs**: ${report.summary.totalUrls}`,
-                `- **Total Links Validated**: ${report.summary.totalLinks}`,
-                `- **404 Errors**: ${report.summary.total404Errors}`,
-                `- **999 Errors**: ${report.summary.total999Errors}`
-              ].join('\n')
-              
-              // Create detailed test results table
-              testResultsTable = [
-                '## Test Results Details',
-                '',
-                '| URL | Status | Duration (ms) | Page Load | Total Links | Valid Links | 404 Errors |',
-                '|-----|--------|---------------|-----------|-------------|-------------|------------|'
-              ]
-              
-              for (const test of report.tests.slice(0, 50)) {
-                const statusIcon = test.status === 'passed' ? '✅' : '❌'
-                // Create a clickable link with truncated display text
-                const displayUrl = test.url.length > 50 ? test.url.substring(0, 47) + '...' : test.url
-                const urlLink = `[${displayUrl}](${test.url})`
-                const duration = Math.round(test.duration)
-                const pageLoad = test.pageLoadStatus || 'N/A'
-                const totalLinks = test.linkValidation.totalLinks
-                const validLinks = test.linkValidation.validLinks
-                const errors404 = test.linkValidation.errors404.length
-                
-                testResultsTable.push(
-                  `| ${urlLink} | ${statusIcon} | ${duration} | ${pageLoad} | ${totalLinks} | ${validLinks} | ${errors404} |`
-                )
-              }
-              
-              if (report.tests.length > 50) {
-                testResultsTable.push(`| ... | ... | ... | ... | ... | ... | ... |`)
-                testResultsTable.push(`| *${report.tests.length - 50} more tests* | | | | | | |`)
-              }
-              
-              testResultsTable = testResultsTable.join('\n')
-            } else {
-              // Fallback for when JSON report is not available
-              summarySection = `- **Status**: ${testResults.status.toUpperCase()} ${statusEmoji}`
-              if (testResults.jobs) {
-                const jobResults = testResults.jobs.map(job => {
-                  const jobEmoji = job.status === 'success' ? '✅' : '❌'
-                  return `- **${job.name}**: ${job.status.toUpperCase()} ${jobEmoji} (${job.duration}m)`
-                }).join('\n')
-                testResultsTable = `## Job Results\n\n${jobResults}`
-              }
-            }
-            
-            const wikiContent = [
-              `# Daily DC Test Results (Stage) - ${today}`,
-              '',
-              '## Test Summary',
-              `- **Environment**: STAGE 🚧`,
-              `- **Status**: ${testResults.status.toUpperCase()} ${statusEmoji}`,
-              `- **Start Time**: ${new Date(testResults.startTime).toLocaleString()}`,
-              `- **Duration**: ${testResults.duration} minutes`,
-              `- **Workflow**: [View Details](${testResults.workflowUrl})`,
-              summarySection,
-              '',
-              testResultsTable,
-              '',
-              '---',
-              `*Last updated: ${new Date().toISOString()}*`,
-              '*Generated by Daily DC Tests workflow*'
-            ].join('\n')
-            
-            try {
-              // Create or update wiki page by creating a commit to the wiki repository
-              const wikiRepo = `${context.repo.repo}.wiki`
-              const fileName = `Daily-DC-Test-Results-Stage-${today}.md`
-              
-              // Try to get existing file
-              let existingFile = null
-              try {
-                existingFile = await github.rest.repos.getContent({
-                  owner: context.repo.owner,
-                  repo: wikiRepo,
-                  path: fileName
-                })
-              } catch (error) {
-                console.log('Wiki page does not exist, will create new one')
-              }
-              
-              // Create or update the wiki page
-              const commitMessage = `Update daily stage test results for ${today}`
-              const contentBase64 = Buffer.from(wikiContent).toString('base64')
-              
-              if (existingFile) {
-                // Update existing file
-                await github.rest.repos.createOrUpdateFileContents({
-                  owner: context.repo.owner,
-                  repo: wikiRepo,
-                  path: fileName,
-                  message: commitMessage,
-                  content: contentBase64,
-                  sha: existingFile.data.sha
-                })
-                console.log(`Updated wiki page: ${fileName}`)
-              } else {
-                // Create new file
-                await github.rest.repos.createOrUpdateFileContents({
-                  owner: context.repo.owner,
-                  repo: wikiRepo,
-                  path: fileName,
-                  message: commitMessage,
-                  content: contentBase64
-                })
-                console.log(`Created new wiki page: ${fileName}`)
-              }
-              
-              console.log(`Stage wiki updated successfully. View at: https://github.com/${context.repo.owner}/${context.repo.repo}/wiki`)
-              
-            } catch (error) {
-              console.log('Could not access wiki, creating issue with results instead')
-              console.log('Error:', error.message)
-              
-              // Fallback: Create issue with results
-              const issue = await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `Daily DC Test Results (Stage) - ${today}`,
-                body: wikiContent,
-                labels: ['test-results', 'daily-report', 'stage']
-              })
-              
-              console.log(`Created issue with test results: ${issue.data.html_url}`)
-            }
-
-      - name: Clean up
-        run: |
-          rm -f screenshots.zip test-results.zip
-          rm -rf extracted_screenshots/ extracted_test_results/ 
+ 
