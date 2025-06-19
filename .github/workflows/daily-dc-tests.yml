@@ -91,8 +91,9 @@ jobs:
         with:
           timeout-minutes: 45
           script: |
-            const dispatchResult = ${{ steps.dispatch.outputs.result }}
-            const dispatchTime = dispatchResult || (Date.now() - 60000) // Fallback to 1 minute ago if empty
+            const dispatchResult = '${{ steps.dispatch.outputs.result }}' || '';
+            const dispatchTime = dispatchResult ? parseInt(dispatchResult) : (Date.now() - 60000); // Fallback to 1 minute ago if empty
+            console.log(`Dispatch result: '${dispatchResult}'`)
             console.log(`Using dispatch time: ${dispatchTime}`)
             
             const maxWaitTime = 45 * 60 * 1000 // 45 minutes
