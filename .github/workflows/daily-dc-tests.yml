@@ -81,7 +81,9 @@ jobs:
             })
             
             console.log("Successfully dispatched pageload.yml workflow for ${{ matrix.environment }} environment")
-            return Date.now()
+            const dispatchTime = Date.now()
+            console.log(`Dispatch timestamp: ${dispatchTime}`)
+            return dispatchTime
       
       - name: Wait for workflow completion
         id: wait
@@ -89,7 +91,10 @@ jobs:
         with:
           timeout-minutes: 45
           script: |
-            const dispatchTime = ${{ steps.dispatch.outputs.result }}
+            const dispatchResult = ${{ steps.dispatch.outputs.result }}
+            const dispatchTime = dispatchResult || (Date.now() - 60000) // Fallback to 1 minute ago if empty
+            console.log(`Using dispatch time: ${dispatchTime}`)
+            
             const maxWaitTime = 45 * 60 * 1000 // 45 minutes
             const pollInterval = 30 * 1000 // 30 seconds
             
