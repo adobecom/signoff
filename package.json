@@ -10,14 +10,18 @@
   "author": "Adobe",
   "license": "Apache License 2.0",
   "dependencies": {
-    "@playwright/test": "^1.52.0",
-    "js-yaml": "^4.1.0",
-    "playwright": "^1.52.0",    
     "@rollup/plugin-replace": "5.0.5",
     "@web/test-runner": "0.18.1",
     "@web/test-runner-commands": "0.9.0",
     "@web/test-runner-playwright": "0.11.0",
+    "dotenv": "^17.2.2",
+    "js-yaml": "^4.1.0",
+    "playwright": "^1.55.1",
     "sinon": "^17.0.1",
     "sync-fetch": "^0.5.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@types/node": "^24.5.2"
   }
 }
