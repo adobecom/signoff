@@ -40,14 +40,13 @@ jobs:
           SLACK_ICON: https://github.com/actions.png?size=48
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
-            ✅ **Test Notification - SUCCESS**
-
             Message: ${{ inputs.message }}
             Repository: ${{ github.repository }}
             Triggered by: ${{ github.actor }}
 
             This is a test of the Slack notification system.
-          SLACK_TITLE: GitHub Actions Notification Test
+          SLACK_TITLE: ✅ Test Notification - SUCCESS
+          SLACK_FOOTER: ""
           SLACK_USERNAME: GitHub Actions
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
@@ -59,8 +58,6 @@ jobs:
           SLACK_ICON: https://github.com/actions.png?size=48
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
-            ❌ **Test Notification - FAILURE**
-
             Message: ${{ inputs.message }}
             Repository: ${{ github.repository }}
             Triggered by: ${{ github.actor }}
@@ -68,6 +65,7 @@ jobs:
 
             This is a test of the failure notification system.
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: GitHub Actions Notification Test - FAILED
+          SLACK_TITLE: ❌ Test Notification - FAILURE
+          SLACK_FOOTER: ""
           SLACK_USERNAME: GitHub Actions
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
