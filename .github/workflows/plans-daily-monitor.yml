@@ -53,11 +53,13 @@ jobs:
         env:
           SLACK_COLOR: good
           SLACK_ICON: https://github.com/actions.png?size=48
-          MSG_MINIMAL: true
-          SLACK_MESSAGE: ""
-          SLACK_TITLE: ✅ Test Notification - SUCCESS
-          SLACK_FOOTER: ""
           SLACK_USERNAME: Plans Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_TITLE: ✅ Test Notification - SUCCESS
+          SLACK_MESSAGE: |
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
       - name: Slack notification on failure
@@ -66,11 +68,12 @@ jobs:
         env:
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans Monitor
+          SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_TITLE: ❌ Test Notification - FAILURE
           SLACK_FOOTER: ""
-          SLACK_USERNAME: Plans Monitor
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
