@@ -1,0 +1,72 @@
+name: Test Slack Notification
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Test message to send'
+        required: false
+        default: 'This is a test notification from GitHub Actions'
+        type: string
+      simulate_failure:
+        description: 'Simulate failure for testing failure notifications'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  test-notification:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Simulate test execution
+        run: |
+          echo "Running test simulation..."
+          if [ "${{ inputs.simulate_failure }}" = "true" ]; then
+            echo "Simulating failure..."
+            exit 1
+          else
+            echo "Test completed successfully"
+          fi
+
+      - name: Slack notification on success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: good
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_MESSAGE: |
+            ✅ **Test Notification - SUCCESS**
+
+            Message: ${{ inputs.message }}
+            Repository: ${{ github.repository }}
+            Triggered by: ${{ github.actor }}
+
+            This is a test of the Slack notification system.
+          SLACK_TITLE: GitHub Actions Notification Test
+          SLACK_USERNAME: GitHub Actions
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Slack notification on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: general
+          SLACK_COLOR: danger
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_MESSAGE: |
+            ❌ **Test Notification - FAILURE**
+
+            Message: ${{ inputs.message }}
+            Repository: ${{ github.repository }}
+            Triggered by: ${{ github.actor }}
+            Run ID: ${{ github.run_id }}
+
+            This is a test of the failure notification system.
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TITLE: GitHub Actions Notification Test - FAILED
+          SLACK_USERNAME: GitHub Actions
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
