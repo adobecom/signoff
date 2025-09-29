@@ -46,3 +46,31 @@ jobs:
             playwright-report/
             screenshots/
           retention-days: 30
+
+      - name: Slack notification on success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: good
+          SLACK_ICON: https://github.com/actions.png?size=48
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: ""
+          SLACK_TITLE: ✅ Test Notification - SUCCESS
+          SLACK_FOOTER: ""
+          SLACK_USERNAME: Plans Monitor
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Slack notification on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: danger
+          SLACK_ICON: https://github.com/actions.png?size=48
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: |
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TITLE: ❌ Test Notification - FAILURE
+          SLACK_FOOTER: ""
+          SLACK_USERNAME: Plans Monitor
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
