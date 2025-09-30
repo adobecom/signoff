@@ -16,7 +16,7 @@ class PlansPage {
       'Students & Teachers': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Students & Teachers']}"]`),
       'Schools & Universities': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Schools & Universities']}"]`),
     }
-    this.checkoutButtons = page.locator('.tabpanel:not([hidden]) a.button[is="checkout-link"]');
+    this.checkoutButtons = page.locator('.tabpanel:not([hidden]) a.button[is="checkout-link"]').filter({ visible: true });
     this.miloIframe = page.frameLocator('div.milo-iframe iframe');
   }
 
@@ -150,8 +150,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       }
 
       // Find CTA buttons in the current tab
-      let allButtons = await plansPage.checkoutButtons.all();
-      let ctaButtons = allButtons.filter(async(x) => await x.isVisible());
+      let ctaButtons = await plansPage.checkoutButtons.all();
 
       console.log(`Found ${ctaButtons.length} CTA buttons in ${tabName} tab`);
 
@@ -269,8 +268,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               } catch (error) {
                 console.log('Timeout on waiting for netword idle!');
               }
-              allButtons = await page.$$('.tabpanel:not([hidden]) a.button[is="checkout-link"]');
-              ctaButtons = allButtons.filter(async(x) => await x.isVisible());
+              ctaButtons = await plansPage.checkoutButtons.all();
             } else {
               // Close the modal
               let closeButton = await page.$('button[aria-label*="Close"]'); 
