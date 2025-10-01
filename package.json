@@ -5,7 +5,11 @@
     "test": "playwright test --workers 2",
     "int": "wtr \"./test/**/*.int.(js|html)\" --node-resolve --port=2000 --concurrent-browsers 3 --config wtr-integration.config.mjs",
     "int:file": "wtr --node-resolve --port=2000 --concurrent-browsers 3 --config wtr-integration.config.mjs",
-    "int:file:watch": "npm run int:file -- --watch"
+    "int:file:watch": "npm run int:file -- --watch",
+    "postinstall": "npm update browserstack-node-sdk",
+    "int-browserstack": "browserstack-node-sdk wtr \"./test/**/*.int.(js|html)\" --node-resolve --port=2000 --concurrent-browsers 3 --config wtr-integration.config.mjs",
+    "int:file-browserstack": "browserstack-node-sdk wtr --node-resolve --port=2000 --concurrent-browsers 3 --config wtr-integration.config.mjs",
+    "test-browserstack": "browserstack-node-sdk playwright test --workers 2"
   },
   "author": "Adobe",
   "license": "Apache License 2.0",
@@ -22,6 +26,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.55.1",
-    "@types/node": "^24.5.2"
+    "@types/node": "^24.5.2",
+    "browserstack-node-sdk": "^1.43.0"
   }
 }
