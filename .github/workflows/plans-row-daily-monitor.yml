@@ -1,0 +1,87 @@
+name: Plans ROW Daily Monitor
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Test URL'
+        required: false
+        type: string
+      test_tabs:
+        description: 'Test Tabs'
+        required: false
+        type: string        
+
+env:
+  TEST_URL: ${{ github.event.inputs.test_url || 'https://www.adobe.com/uk/creativecloud/plans.html'}}
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run plans ROW monitor
+        run: npx playwright test plans/monitor_row.spec.js
+        env:
+          TEST_TABS: ${{ inputs.test_tabs }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: plans-row-monitor-results-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+          retention-days: 30
+
+      - name: Slack notification on success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: good
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans ROW Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_TITLE: ✅ Plans ROW Monitor - SUCCESS
+          SLACK_MESSAGE: |
+            Test URL: ${{ env.TEST_URL}}
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Slack notification on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: danger
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans ROW Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: |
+            Test URL: ${{ env.TEST_URL}}
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TITLE: ❌ Plans ROW Monitor - FAILURE
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}

@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 class PlansPage {
   constructor(page) {
     this.page = page;
-    this.pageLoadOk = page.locator('div#page-load-ok-milo');
+    this.pageLoadOk = page.locator('div.evidon-notice-link');
     this.tabKeys = {
       'Individuals': 'individual',
       'Business': 'team',
@@ -11,32 +11,56 @@ class PlansPage {
       'Schools & Universities': 'edu_inst'
     }
     this.tabs = {
-      'Individuals': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Individuals']}"]`),
-      'Business': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Business']}"]`),
-      'Students & Teachers': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Students & Teachers']}"]`),
-      'Schools & Universities': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Schools & Universities']}"]`),
+      'Individuals': page.locator(`div[data-query-value="${this.tabKeys['Individuals']}"]`),
+      'Business': page.locator(`div[data-query-value="${this.tabKeys['Business']}"]`),
+      'Students & Teachers': page.locator(`div[data-query-value="${this.tabKeys['Students & Teachers']}"]`),
+      'Schools & Universities': page.locator(`div[data-query-value="${this.tabKeys['Schools & Universities']}"]`),
     }
-    this.checkoutButtons = page.locator('.tabpanel:not([hidden]) a.button[is="checkout-link"]').filter({ visible: true });
-    this.miloIframe = page.frameLocator('div.milo-iframe iframe');
+    this.checkoutButtons = page.locator('.is-Selected[role="tabpanel"] :is(plans-card, .plans-card) .dexter-Cta .spectrum-Button--cta').filter({ visible: true });
+    this.checkoutModal = page.locator(':is(div.ReactModalPortal .commerce-context-container, div.iframe iframe)').filter({visible: true});
+    this.checkoutIframe = page.frameLocator('div.iframe iframe');
+    this.cardSelector = ':is(plans-card, .plans-card)';
+    this.modalCloseButton = page.locator('button[aria-label*="Close"], .dexter-CloseButton').filter({visible: true});
   }
 
   async verifyTabPanel(tab) {
-    // tab and panel use different key
-    const panelKey = this.tabKeys[tab].replace('_', '-');
-    await expect(this.page.locator(`.tabpanel:not(hidden) .plans-${panelKey}`)).toBeVisible({timeout: 10000});
+    const urlObject = new URL(await this.page.url());
+    const locale = urlObject.pathname.split('/')[1];
+    const localeMap = {
+      uk: {
+        'Individuals': 'Individuals',
+        'Business': 'Business',
+        'Students & Teachers': 'Students & Teachers',
+        'Schools & Universities': 'Schools & Universities'
+      }
+    }
+    const label = localeMap[locale][tab];
+    await expect(this.page.locator(`[role="tabpanel"][aria-label="${label}"]`).filter({visible: true})).toBeVisible({timeout: 10000});
   }
 }
 
-test.describe('Creative Cloud Plans Page Monitoring', () => {
+test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
 
   test.use({
     userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 ${process.env.USER_AGENT_SUFFIX}`,
   });
 
-  const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/plans.html';
+  const testUrl = process.env.TEST_URL || 'https://www.adobe.com/uk/creativecloud/plans.html';
   console.log(`Testing URL: ${testUrl}`);
 
   test.beforeEach(async ({ page }) => {
+    // Block Adobe messaging endpoint to disable Jarvis
+    await page.route('https://client.messaging.adobe.com/**', route => route.abort());
+
+    // Mock geo location response
+    await page.route('https://geo2.adobe.com/json/', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ country: 'uk' })
+      })
+    );
+
     try {
       await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
     } catch (err) {
@@ -133,7 +157,14 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     let allCtaResults = [];
     let priceMatchErrors = [];
 
+    const selectedTabs = process.env.TEST_TABS && process.env.TEST_TABS.split(',');
+
     for (const [tabName, tabElement] of Object.entries(plansPage.tabs)) {
+      // Test selected tabs
+      if (selectedTabs && !selectedTabs.includes(tabName)) {
+        continue;
+      }
+
       await page.evaluate("window.scrollTo(0, 0)");
       await page.waitForTimeout(1000)
 
@@ -162,9 +193,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           let originalPrice = null;
           try {
             // Try to find price in the button's parent container
-            const parentContent = await ctaButton.evaluate(el => (el.closest('merch-card') || el.parentElement).textContent);
+            const parentContent = await ctaButton.evaluate((el, sel) => (el.closest(sel) || el.parentElement).textContent, plansPage.cardSelector);
             if (parentContent) {
-              const priceMatch = parentContent.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/);
+              const priceMatch = parentContent.match(/[£€$¥₹]\s?\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?|\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?\s?[£€$¥₹]/);
               originalPrice = priceMatch ? priceMatch[0] : null;
             }
 
@@ -174,14 +205,14 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 const siblings = Array.from(el.parentElement?.children || []);
                 return siblings.map(sibling => sibling.textContent).join(' ');
               });
-              const priceMatch = nearbyContent.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/);
+              const priceMatch = nearbyContent.match(/[£€$¥₹]\s?\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?|\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?\s?[£€$¥₹]/);
               originalPrice = priceMatch ? priceMatch[0] : null;
             }
           } catch (error) {
             console.log(`Could not extract price for ${tabName} CTA ${i + 1}:`, error.message);
           }
 
-          const buttonText = await ctaButton.textContent();
+          const buttonText = await ctaButton.innerText();
           console.log(`Testing ${tabName} CTA ${i + 1}: "${buttonText.trim()}" - potential price: ${originalPrice || 'Not found'}`);
 
           // Take screenshot before clicking
@@ -201,7 +232,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           // Wait for navigation or new page
           try {
-            await targetPage.waitForLoadState('networkidle', { timeout: 10000 });
+            await targetPage.waitForLoadState('networkidle', { timeout: 5000 });
             navigated = true;
           } catch (error) {
             // Try waiting for URL change on current page
@@ -214,7 +245,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             const finalUrl = targetPage.url();
             let finalPageContent = '';
             if (finalUrl.startsWith(testUrl)) {
-              finalPageContent = await plansPage.miloIframe.locator('#three-in-one-side-panel').textContent();
+              await expect(plansPage.checkoutModal).toBeVisible();
+              const tagName = await plansPage.checkoutModal.evaluate(el => el.tagName);
+              const normLocator = tagName === 'IFRAME' ? plansPage.checkoutModal.contentFrame() : plansPage.checkoutModal;
+              finalPageContent = await normLocator.locator('div.modal-payment').textContent();
             } else {
               finalPageContent = await targetPage.textContent('body');
             }
@@ -226,10 +260,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             // Look for price consistency
             let checkoutPrice = null;
             if (originalPrice) {
-              const checkoutPriceMatch = finalPageContent.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g);
+              const checkoutPriceMatch = finalPageContent.match(/[£€$¥₹]\s?\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?|\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?\s?[£€$¥₹]/g);
               console.log(`checkoutPriceMatch for ${tabName} CTA ${i + 1}:`, checkoutPriceMatch);
               checkoutPrice = checkoutPriceMatch ? checkoutPriceMatch.find(price =>
-                price.replace(/[^\d.]/g, '') === originalPrice.replace(/[^\d.]/g, '')
+                price.replace(/[^\d.,]/g, '') === originalPrice.replace(/[^\d.,]/g, '')
               ) : null;
 
               // Track price match errors
@@ -271,11 +305,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               ctaButtons = await plansPage.checkoutButtons.all();
             } else {
               // Close the modal
-              let closeButton = await page.$('button[aria-label*="Close"]'); 
-              while (closeButton) {
-                await closeButton.click();
+              let visible = await plansPage.modalCloseButton.isVisible(); 
+              while (visible) {
+                await plansPage.modalCloseButton.click();
                 await page.waitForTimeout(1000);
-                closeButton = await page.$('button[aria-label*="Close"]');
+                visible = await plansPage.modalCloseButton.isVisible();
               } 
             }
           } else {
