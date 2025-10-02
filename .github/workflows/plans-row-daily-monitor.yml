@@ -43,11 +43,25 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          if [ "${{ github.event_name }}" == "schedule" ] || [ "${{ inputs.locale }}" == "" ]; then
-            # Run all locales
+          CURRENT_HOUR=$(date -u +%H)
+
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            # Run only the locale matching the current hour
+            case "$CURRENT_HOUR" in
+              "02") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
+              "03") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
+              "04") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"}]}' >> $GITHUB_OUTPUT ;;
+              "05") echo 'matrix={"include":[{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"}]}' >> $GITHUB_OUTPUT ;;
+              "06") echo 'matrix={"include":[{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"}]}' >> $GITHUB_OUTPUT ;;
+              "07") echo 'matrix={"include":[{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
+              "08") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
+              "09") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
+            esac
+          elif [ "${{ inputs.locale }}" == "" ]; then
+            # Manual trigger with no locale: run all
             echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT
           else
-            # Run only selected locale
+            # Manual trigger with specific locale
             case "${{ inputs.locale }}" in
               "UK") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
               "Japan") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
