@@ -32,12 +32,20 @@ platforms:
     os: OS X
     osVersion: Tahoe
     browserVersion: latest
-  # - browserName: chrome
-  #   osVersion: 13.0
-  #   deviceName: Samsung Galaxy S23
-  # - browserName: safari
-  #   osVersion: 26
-  #   deviceName: iPhone 15
+    playwrightConfigOptions:
+      name: browserstack-mac-chrome
+  - browserName: chrome
+    osVersion: 13.0
+    deviceName: Samsung Galaxy S23
+    realMobile: true
+    playwrightConfigOptions:
+      name: browserstack-android
+  - browserName: safari
+    osVersion: 17
+    deviceName: iPhone 15
+    realMobile: true
+    playwrightConfigOptions:
+      name: browserstack-ios
     
 # =======================
 # Parallels per Platform
@@ -57,11 +65,12 @@ parallelsPerPlatform: 5
 # Set browserStackLocal to true if your website under test is not accessible publicly over the internet
 # Learn more about how BrowserStack Local works here -> https://www.browserstack.com/docs/automate/selenium/local-testing-introduction
 browserstackLocal: true # <boolean> (Default false)
-# browserStackLocalOptions:
+browserStackLocalOptions:
 # Options to be passed to BrowserStack local in-case of advanced configurations
   # localIdentifier: # <string> (Default: null) Needed if you need to run multiple instances of local.
-  # forceLocal: true  # <boolean> (Default: false) Set to true if you need to resolve all your traffic via BrowserStack Local tunnel.
+  forceLocal: true  # <boolean> (Default: false) Set to true if you need to resolve all your traffic via BrowserStack Local tunnel.
   # Entire list of arguments available here -> https://www.browserstack.com/docs/automate/selenium/manage-incoming-connections
+  acceptInsecureCerts: true
 
 # ===================
 # Debugging features
