@@ -40,6 +40,30 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
 
+    {
+      name: 'browserstack-mac-chrome',
+      use: {
+        // This project name can match a platform in your browserstack.yml
+        // Example: ...devices['iPhone 12'] or custom capabilities
+      },
+    },
+
+    {
+      name: 'browserstack-ios',
+      use: {
+        // This project name can match a platform in your browserstack.yml
+        // Example: ...devices['iPhone 12'] or custom capabilities
+      },
+    },
+
+    {
+      name: 'browserstack-android',
+      use: {
+        // This project name can match a platform in your browserstack.yml
+        // Example: ...devices['iPhone 12'] or custom capabilities
+      },
+    },
+
     //{
     //  name: 'firefox',
     //  use: { ...devices['Desktop Firefox'] },
