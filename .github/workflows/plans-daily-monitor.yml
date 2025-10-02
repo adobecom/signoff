@@ -2,8 +2,8 @@ name: Plans Daily Monitor
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC
-  workflow_dispatch:  # Allow manual trigger
+    - cron: '0 1 * * *'  # Daily at 1 AM UTC
+  workflow_dispatch:
     inputs:
       test_url:
         description: 'Test URL'

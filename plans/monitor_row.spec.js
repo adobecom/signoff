@@ -19,23 +19,15 @@ class PlansPage {
     this.checkoutButtons = page.locator('.is-Selected[role="tabpanel"] :is(plans-card, .plans-card) .dexter-Cta .spectrum-Button--cta').filter({ visible: true });
     this.checkoutModal = page.locator(':is(div.ReactModalPortal .commerce-context-container, div.iframe iframe)').filter({visible: true});
     this.checkoutIframe = page.frameLocator('div.iframe iframe');
+    //this.modalCloseButton = page.locator('button[aria-label*="Close"], .dexter-CloseButton').filter({visible: true});
+    this.modalCloseButton = page.locator('svg.close-button-modal, .dexter-CloseButton').filter({visible: true});
     this.cardSelector = ':is(plans-card, .plans-card)';
-    this.modalCloseButton = page.locator('button[aria-label*="Close"], .dexter-CloseButton').filter({visible: true});
+    this.priceSelector = 'span[data-wcs-type="price"]';
   }
 
   async verifyTabPanel(tab) {
-    const urlObject = new URL(await this.page.url());
-    const locale = urlObject.pathname.split('/')[1];
-    const localeMap = {
-      uk: {
-        'Individuals': 'Individuals',
-        'Business': 'Business',
-        'Students & Teachers': 'Students & Teachers',
-        'Schools & Universities': 'Schools & Universities'
-      }
-    }
-    const label = localeMap[locale][tab];
-    await expect(this.page.locator(`[role="tabpanel"][aria-label="${label}"]`).filter({visible: true})).toBeVisible({timeout: 10000});
+    const tabName = await this.tabs[tab].textContent();
+    await expect(this.page.locator(`[role="tabpanel"][aria-label*="${tabName.trim()}"]`).filter({visible: true})).toBeVisible({timeout: 10000});
   }
 }
 
@@ -48,6 +40,11 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/uk/creativecloud/plans.html';
   console.log(`Testing URL: ${testUrl}`);
 
+  // Extract country code from URL path (e.g., /uk/ -> 'uk')
+  const urlPath = new URL(testUrl).pathname;
+  const countryCode = urlPath.split('/').filter(Boolean)[0] || 'uk';
+  console.log(`Mocking geo location with country: ${countryCode}`);
+
   test.beforeEach(async ({ page }) => {
     // Block Adobe messaging endpoint to disable Jarvis
     await page.route('https://client.messaging.adobe.com/**', route => route.abort());
@@ -57,7 +54,7 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ country: 'uk' })
+        body: JSON.stringify({ country: countryCode })
       })
     );
 
@@ -189,25 +186,12 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
         const ctaButton = ctaButtons[i];
 
         try {
-          // Extract price information from content near the specific button
           let originalPrice = null;
           try {
-            // Try to find price in the button's parent container
-            const parentContent = await ctaButton.evaluate((el, sel) => (el.closest(sel) || el.parentElement).textContent, plansPage.cardSelector);
-            if (parentContent) {
-              const priceMatch = parentContent.match(/[£€$¥₹]\s?\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?|\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?\s?[£€$¥₹]/);
-              originalPrice = priceMatch ? priceMatch[0] : null;
-            }
-
-            // Fallback: if no price found in parent, look for price in nearby siblings
-            if (!originalPrice) {
-              const nearbyContent = await ctaButton.evaluate(el => {
-                const siblings = Array.from(el.parentElement?.children || []);
-                return siblings.map(sibling => sibling.textContent).join(' ');
-              });
-              const priceMatch = nearbyContent.match(/[£€$¥₹]\s?\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?|\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?\s?[£€$¥₹]/);
-              originalPrice = priceMatch ? priceMatch[0] : null;
-            }
+            originalPrice = await ctaButton.evaluate(
+              (el, card, price) => el.closest(card).querySelector('span[data-wcs-type="price"]')?.textContent, 
+              plansPage.cardSelector
+            );
           } catch (error) {
             console.log(`Could not extract price for ${tabName} CTA ${i + 1}:`, error.message);
           }
@@ -243,29 +227,29 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
 
           if (navigated) {
             const finalUrl = targetPage.url();
-            let finalPageContent = '';
+            let finalCheckoutNode = null;
+            let checkoutPrices;
             if (finalUrl.startsWith(testUrl)) {
               await expect(plansPage.checkoutModal).toBeVisible();
               const tagName = await plansPage.checkoutModal.evaluate(el => el.tagName);
               const normLocator = tagName === 'IFRAME' ? plansPage.checkoutModal.contentFrame() : plansPage.checkoutModal;
-              finalPageContent = await normLocator.locator('div.modal-payment').textContent();
+              finalCheckoutNode = await normLocator.locator('div.modal-payment .subscription-panel-offers');
+              const checkoutPriceElements = await finalCheckoutNode.locator('span[data-wcs-type="price"]').filter({visible: true}).all();
+              checkoutPrices = await Promise.all(checkoutPriceElements.map(async(x) => await x.textContent()));
             } else {
-              finalPageContent = await targetPage.textContent('body');
+              finalCheckoutNode = await targetPage.locator('body');
+              const priceElements = await finalCheckoutNode.locator(':is(div.price, span[data-wcs-type="price"])').filter({visible: true}).all();
+              checkoutPrices = await Promise.all(priceElements.map(async(x) => await x.textContent()));
             }
-
-            // Check for checkout/purchase page indicators
-            const isCheckoutPage = /checkout|purchase|payment|billing|cart|order/i.test(finalPageContent) ||
-                                  /checkout|purchase|payment|billing|cart|order/i.test(finalUrl);
 
             // Look for price consistency
             let checkoutPrice = null;
             if (originalPrice) {
-              const checkoutPriceMatch = finalPageContent.match(/[£€$¥₹]\s?\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?|\d{1,3}(?:[,.\s]\d{3})*(?:[,.]\d{2})?\s?[£€$¥₹]/g);
-              console.log(`checkoutPriceMatch for ${tabName} CTA ${i + 1}:`, checkoutPriceMatch);
-              checkoutPrice = checkoutPriceMatch ? checkoutPriceMatch.find(price =>
-                price.replace(/[^\d.,]/g, '') === originalPrice.replace(/[^\d.,]/g, '')
+              console.log(`checkoutPriceMatch for ${tabName} CTA ${i + 1}:`, checkoutPrices);
+              const originalPriceNumber = originalPrice.split('/')[0].replace(/[^\d.,]/g, '');
+              checkoutPrice = checkoutPrices ? checkoutPrices.find(price =>
+                price.split('/')[0].replace(/[^\d.,]/g, '') === originalPriceNumber
               ) : null;
-
               // Track price match errors
               if (!checkoutPrice) {
                 const error = `Price mismatch: Original price ${originalPrice} not found in checkout page for ${tabName} CTA ${i + 1}`;
@@ -286,13 +270,12 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
               buttonText: buttonText.trim(),
               originalPrice,
               finalUrl,
-              isCheckoutPage,
               checkoutPrice,
               priceConsistent: originalPrice && checkoutPrice ? true : null,
               navigationSuccessful: true
             });
 
-            console.log(`${tabName} CTA ${i + 1} Result: Navigated to ${finalUrl}, Checkout: ${isCheckoutPage}, Price match: ${checkoutPrice ? 'Yes' : 'No'}`);
+            console.log(`${tabName} CTA ${i + 1} Result: Navigated to ${finalUrl}, Price match: ${checkoutPrice ? 'Yes' : 'No'}`);
 
             // Close new page if it was opened
             if (!finalUrl.startsWith(testUrl)) {
@@ -341,12 +324,10 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
 
     // Verify results across all tabs
     const successfulCTAs = allCtaResults.filter(result => result.navigationSuccessful);
-    const checkoutPages = allCtaResults.filter(result => result.isCheckoutPage);
 
     console.log(`\n=== Cross-Tab CTA Test Summary ===`);
     console.log(`Total CTAs tested: ${allCtaResults.length}`);
     console.log(`Successful navigations: ${successfulCTAs.length}`);
-    console.log(`Checkout pages found: ${checkoutPages.length}`);
 
     // Log results by tab
     Object.keys(plansPage.tabs).forEach(tab => {
@@ -361,12 +342,6 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
     } else {
       console.log('No CTA buttons found across all tabs - test passed');
       expect(allCtaResults.length).toBeGreaterThanOrEqual(0);
-    }
-
-    // If we have checkout pages, log price consistency
-    if (checkoutPages.length > 0) {
-      const consistentPrices = checkoutPages.filter(result => result.priceConsistent);
-      console.log(`Price consistency: ${consistentPrices.length}/${checkoutPages.length} pages`);
     }
 
     // Fail the test if there are any price match errors

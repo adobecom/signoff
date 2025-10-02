@@ -2,7 +2,14 @@ name: Plans ROW Daily Monitor
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+    - cron: '0 2 * * *'
+    - cron: '0 3 * * *'
+    - cron: '0 4 * * *'
+    - cron: '0 5 * * *'
+    - cron: '0 6 * * *'
+    - cron: '0 7 * * *'
+    - cron: '0 8 * * *'
+    - cron: '0 9 * * *'
   workflow_dispatch:
     inputs:
       test_url:
@@ -12,16 +19,43 @@ on:
       test_tabs:
         description: 'Test Tabs'
         required: false
-        type: string        
-
-env:
-  TEST_URL: ${{ github.event.inputs.test_url || 'https://www.adobe.com/uk/creativecloud/plans.html'}}
+        type: string
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.55.1-noble
+    strategy:
+      matrix:
+        include:
+          - url: 'https://www.adobe.com/uk/creativecloud/plans.html'
+            cron: '0 2 * * *'
+            locale: 'UK'
+          - url: 'https://www.adobe.com/jp/creativecloud/plans.html'
+            cron: '0 3 * * *'
+            locale: 'Japan'
+          - url: 'https://www.adobe.com/de/creativecloud/plans.html'
+            cron: '0 4 * * *'
+            locale: 'Germany'
+          - url: 'https://www.adobe.com/fr/creativecloud/plans.html'
+            cron: '0 5 * * *'
+            locale: 'France'
+          - url: 'https://www.adobe.com/es/creativecloud/plans.html'
+            cron: '0 6 * * *'
+            locale: 'Spain'
+          - url: 'https://www.adobe.com/it/creativecloud/plans.html'
+            cron: '0 7 * * *'
+            locale: 'Italy'
+          - url: 'https://www.adobe.com/in/creativecloud/plans.html'
+            cron: '0 8 * * *'
+            locale: 'India'
+          - url: 'https://www.adobe.com/br/creativecloud/plans.html'
+            cron: '0 9 * * *'
+            locale: 'Brazil'
+      
+    env:
+      TEST_URL: ${{ github.event.inputs.test_url || matrix.url }}
 
     steps:
       - name: Checkout code
@@ -48,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: plans-row-monitor-results-${{ github.run_number }}
+          name: plans-row-monitor-${{ matrix.locale }}-${{ github.run_number }}
           path: |
             playwright-report/
             screenshots/
@@ -63,9 +97,9 @@ jobs:
           SLACK_USERNAME: Plans ROW Monitor
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
-          SLACK_TITLE: ✅ Plans ROW Monitor - SUCCESS
+          SLACK_TITLE: ✅ Plans ROW Monitor (${{ matrix.locale }}) - SUCCESS
           SLACK_MESSAGE: |
-            Test URL: ${{ env.TEST_URL}}
+            Test URL: ${{ env.TEST_URL }}
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
@@ -80,8 +114,8 @@ jobs:
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
-            Test URL: ${{ env.TEST_URL}}
+            Test URL: ${{ env.TEST_URL }}
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Plans ROW Monitor - FAILURE
+          SLACK_TITLE: ❌ Plans ROW Monitor (${{ matrix.locale }}) - FAILURE
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
