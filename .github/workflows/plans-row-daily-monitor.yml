@@ -66,6 +66,7 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.55.1-noble
     strategy:
+      fail-fast: false
       matrix: ${{ fromJson(needs.filter-matrix.outputs.matrix) }}
     env:
       TEST_URL: ${{ github.event.inputs.test_url || matrix.url }}
