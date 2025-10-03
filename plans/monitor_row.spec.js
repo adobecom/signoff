@@ -142,7 +142,9 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
       }
     }
     
-    expect(successfulTabs).toBe(4);
+    // Brazil page has only 3 tabs (no Schools & Universities)
+    const expectedTabs = countryCode === 'br' ? 3 : 4;
+    expect(successfulTabs).toBe(expectedTabs);
     console.log(`Successfully verified ${successfulTabs} out of ${Object.keys(plansPage.tabs).length} tabs`);
   });
 
