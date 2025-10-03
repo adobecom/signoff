@@ -2,7 +2,8 @@ name: Plans Daily Monitor
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # Daily at 1 AM UTC
+    - cron: '0 1 * * *'
+    - cron: '0 13 * * *'
   workflow_dispatch:
     inputs:
       test_url:
@@ -53,11 +54,12 @@ jobs:
         env:
           SLACK_COLOR: good
           SLACK_ICON: https://github.com/actions.png?size=48
-          SLACK_USERNAME: Plans Monitor
+          SLACK_USERNAME: Plans US Monitor
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
-          SLACK_TITLE: ✅ Test Notification - SUCCESS
+          SLACK_TITLE: ✅ Plans US Monitor 🇺🇸 - SUCCESS
           SLACK_MESSAGE: |
+            Test URL: https://www.adobe.com/creativecloud/plans.html
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
@@ -68,12 +70,13 @@ jobs:
         env:
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
-          SLACK_USERNAME: Plans Monitor
+          SLACK_USERNAME: Plans US Monitor
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
+            Test URL: https://www.adobe.com/creativecloud/plans.html
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Test Notification - FAILURE
+          SLACK_TITLE: ❌ Plans US Monitor 🇺🇸 - FAILURE
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
