@@ -17,13 +17,30 @@ class PlansPage {
       'Schools & Universities': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Schools & Universities']}"]`),
     }
     this.checkoutButtons = page.locator('.tabpanel:not([hidden]) a.button[is="checkout-link"]').filter({ visible: true });
-    this.miloIframe = page.frameLocator('div.milo-iframe iframe');
+    this.cardSelector = 'merch-card';
+    this.miloIframe = page.locator('div.milo-iframe iframe').filter({visible: true});
+    this.panel3in1Selector = '#three-in-one-side-panel';
   }
 
   async verifyTabPanel(tab) {
     // tab and panel use different key
     const panelKey = this.tabKeys[tab].replace('_', '-');
     await expect(this.page.locator(`.tabpanel:not(hidden) .plans-${panelKey}`)).toBeVisible({timeout: 10000});
+  }
+}
+
+class CommerceIFrame {
+  constructor(iframe) {
+    this.iframe = iframe;
+    this.panel3in1 = iframe.locator('#three-in-one-side-panel');
+    this.options = this.panel3in1.locator('div[data-testid="option-selector"]');
+    this.prices = this.options.locator('div[data-testid="price-full-display"]').filter({visible: true});
+  }
+
+  async getCheckoutPrices() {
+    await this.prices.first().waitFor({timeout: 10000});
+    const pricesElems = await this.prices.all();
+    return await Promise.all(pricesElems.map(async(x) => await x.textContent()));
   }
 }
 
@@ -158,25 +175,12 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         const ctaButton = ctaButtons[i];
 
         try {
-          // Extract price information from content near the specific button
           let originalPrice = null;
           try {
-            // Try to find price in the button's parent container
-            const parentContent = await ctaButton.evaluate(el => (el.closest('merch-card') || el.parentElement).textContent);
-            if (parentContent) {
-              const priceMatch = parentContent.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/);
-              originalPrice = priceMatch ? priceMatch[0] : null;
-            }
-
-            // Fallback: if no price found in parent, look for price in nearby siblings
-            if (!originalPrice) {
-              const nearbyContent = await ctaButton.evaluate(el => {
-                const siblings = Array.from(el.parentElement?.children || []);
-                return siblings.map(sibling => sibling.textContent).join(' ');
-              });
-              const priceMatch = nearbyContent.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/);
-              originalPrice = priceMatch ? priceMatch[0] : null;
-            }
+            originalPrice = await ctaButton.evaluate(
+              (el, card) => el.closest(card).querySelector('span[is="inline-price"][data-template="price"]')?.textContent, 
+              plansPage.cardSelector
+            );
           } catch (error) {
             console.log(`Could not extract price for ${tabName} CTA ${i + 1}:`, error.message);
           }
@@ -212,21 +216,23 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           if (navigated) {
             const finalUrl = targetPage.url();
-            let finalPageContent = '';
-            if (finalUrl.startsWith(testUrl)) {
-              finalPageContent = await plansPage.miloIframe.locator('#three-in-one-side-panel').textContent();
-            } else {
-              finalPageContent = await targetPage.textContent('body');
-            }
+            let checkoutPriceMatch;
 
-            // Check for checkout/purchase page indicators
-            const isCheckoutPage = /checkout|purchase|payment|billing|cart|order/i.test(finalPageContent) ||
-                                  /checkout|purchase|payment|billing|cart|order/i.test(finalUrl);
+            if (finalUrl.startsWith(testUrl)) {
+              const frameSrc = await plansPage.miloIframe.getAttribute('src');
+              console.log(`Iframe: ${frameSrc}`);
+              await expect(new URL(frameSrc).pathname).toBe('/store/segmentation')
+              const iframe = new CommerceIFrame(await plansPage.miloIframe.contentFrame());
+              checkoutPriceMatch = await iframe.getCheckoutPrices();
+            } else {
+              console.log(`Redirect: ${finalUrl}`);
+              const finalPageContent = await targetPage.textContent('body');
+              checkoutPriceMatch = finalPageContent.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g);
+            }
 
             // Look for price consistency
             let checkoutPrice = null;
             if (originalPrice) {
-              const checkoutPriceMatch = finalPageContent.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g);
               console.log(`checkoutPriceMatch for ${tabName} CTA ${i + 1}:`, checkoutPriceMatch);
               checkoutPrice = checkoutPriceMatch ? checkoutPriceMatch.find(price =>
                 price.replace(/[^\d.]/g, '') === originalPrice.replace(/[^\d.]/g, '')
@@ -252,13 +258,12 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               buttonText: buttonText.trim(),
               originalPrice,
               finalUrl,
-              isCheckoutPage,
               checkoutPrice,
               priceConsistent: originalPrice && checkoutPrice ? true : null,
               navigationSuccessful: true
             });
 
-            console.log(`${tabName} CTA ${i + 1} Result: Navigated to ${finalUrl}, Checkout: ${isCheckoutPage}, Price match: ${checkoutPrice ? 'Yes' : 'No'}`);
+            console.log(`${tabName} CTA ${i + 1} Result: Navigated to ${finalUrl}, Price match: ${checkoutPrice ? 'Yes' : 'No'}`);
 
             // Close new page if it was opened
             if (!finalUrl.startsWith(testUrl)) {
@@ -307,12 +312,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
     // Verify results across all tabs
     const successfulCTAs = allCtaResults.filter(result => result.navigationSuccessful);
-    const checkoutPages = allCtaResults.filter(result => result.isCheckoutPage);
 
     console.log(`\n=== Cross-Tab CTA Test Summary ===`);
     console.log(`Total CTAs tested: ${allCtaResults.length}`);
     console.log(`Successful navigations: ${successfulCTAs.length}`);
-    console.log(`Checkout pages found: ${checkoutPages.length}`);
 
     // Log results by tab
     Object.keys(plansPage.tabs).forEach(tab => {
@@ -327,12 +330,6 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     } else {
       console.log('No CTA buttons found across all tabs - test passed');
       expect(allCtaResults.length).toBeGreaterThanOrEqual(0);
-    }
-
-    // If we have checkout pages, log price consistency
-    if (checkoutPages.length > 0) {
-      const consistentPrices = checkoutPages.filter(result => result.priceConsistent);
-      console.log(`Price consistency: ${consistentPrices.length}/${checkoutPages.length} pages`);
     }
 
     // Fail the test if there are any price match errors

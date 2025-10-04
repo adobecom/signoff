@@ -191,7 +191,7 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
           let originalPrice = null;
           try {
             originalPrice = await ctaButton.evaluate(
-              (el, card, price) => el.closest(card).querySelector('span[data-wcs-type="price"]')?.textContent, 
+              (el, card) => el.closest(card).querySelector('span[data-wcs-type="price"]')?.textContent, 
               plansPage.cardSelector
             );
           } catch (error) {
