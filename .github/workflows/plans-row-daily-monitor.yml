@@ -109,7 +109,7 @@ jobs:
         run: npm ci
 
       - name: Run plans ROW monitor
-        run: npx playwright test plans/monitor_row.spec.js
+        run: npx playwright test plans/monitor_row.spec.js --project=chromium
         env:
           TEST_TABS: ${{ inputs.test_tabs }}
           USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"

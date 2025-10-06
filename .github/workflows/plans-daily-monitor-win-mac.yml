@@ -1,9 +1,8 @@
-name: Plans Daily Monitor
+name: Plans Daily Monitor on Win/Mac
 
 on:
   schedule:
-    - cron: '0 1 * * *'
-    - cron: '0 13 * * *'
+    - cron: '30 1 * * *'
   workflow_dispatch:
     inputs:
       test_url:
@@ -13,27 +12,33 @@ on:
 
 jobs:
   monitor:
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.55.1-noble
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            browser: chromium
+          - os: macos-latest
+            browser: webkit
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cache node_modules
-        uses: actions/cache@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
+          node-version: 'lts/*'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
       - name: Run plans monitor
-        run: npx playwright test plans/monitor.spec.js --project=chromium
+        run: npx playwright test plans/monitor.spec.js --project=${{ matrix.browser }}
         env:
           TEST_URL: ${{ inputs.test_url }}
           USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
@@ -42,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: plans-monitor-results-${{ github.run_number }}
+          name: plans-monitor-results-${{ matrix.browser }}-${{ github.run_number }}
           path: |
             playwright-report/
             screenshots/
@@ -54,7 +59,7 @@ jobs:
         env:
           SLACK_COLOR: good
           SLACK_ICON: https://github.com/actions.png?size=48
-          SLACK_USERNAME: Plans US Monitor
+          SLACK_USERNAME: Plans US Monitor on ${{ matrix.browser }}
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
           SLACK_TITLE: ✅ Plans US Monitor 🇺🇸 - SUCCESS
@@ -70,7 +75,7 @@ jobs:
         env:
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
-          SLACK_USERNAME: Plans US Monitor
+          SLACK_USERNAME: Plans US Monitor on ${{ matrix.browser }}
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
