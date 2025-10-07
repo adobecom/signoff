@@ -35,6 +35,7 @@ class CommerceIFrame {
     this.panel3in1 = iframe.locator('#three-in-one-side-panel');
     this.options = this.panel3in1.locator('div[data-testid="option-selector"]');
     this.prices = this.options.locator('div[data-testid="price-full-display"]').filter({visible: true});
+    this.continue = this.panel3in1.locator('button:not(:disabled)[data-testid="primary-cta-button"]').filter({visible: true});
   }
 
   async getCheckoutPrices() {
@@ -217,12 +218,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           if (navigated) {
             const finalUrl = targetPage.url();
             let checkoutPriceMatch;
+            let iframe = null;
 
             if (finalUrl.startsWith(testUrl)) {
               const frameSrc = await plansPage.miloIframe.getAttribute('src');
               console.log(`Iframe: ${frameSrc}`);
               await expect(new URL(frameSrc).pathname).toBe('/store/segmentation')
-              const iframe = new CommerceIFrame(await plansPage.miloIframe.contentFrame());
+              iframe = new CommerceIFrame(await plansPage.miloIframe.contentFrame());
               checkoutPriceMatch = await iframe.getCheckoutPrices();
             } else {
               console.log(`Redirect: ${finalUrl}`);
@@ -246,11 +248,38 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               }
             }
 
-            // Take screenshot of final page
-            await targetPage.screenshot({
-              path: `screenshots/plans-${tabName.toLowerCase()}-cta-after-${i + 1}.png`,
-              fullPage: true
-            });
+            // Take screenshot of checkout page
+            await targetPage.screenshot({ path: `screenshots/plans-${tabName.toLowerCase()}-cta-after-${i + 1}.png` });
+
+            // Continue checkout on a modal to commerce
+            let cartTotal;
+            let cartTotalMatched = false;
+            if (iframe) {
+              try {
+                await iframe.continue.click();
+                cartTotal = await page.locator('[class*="CartTotals__total-amount"]').textContent();
+                if (originalPrice) {
+                  console.log(`Cart total amount for ${tabName} CTA ${i + 1}:`, cartTotal);
+                  if (cartTotal.replace(/[^\d.]/g, '') === originalPrice.replace(/[^\d.]/g, '')) {
+                    cartTotalMatched = true;
+                  } else {
+                    const error = `Price mismatch: Original price ${originalPrice} not match the cart total for ${tabName} CTA ${i + 1}`;
+                    console.log(error);
+                    priceMatchErrors.push(error);
+                  }
+                }
+              } catch (error) {
+                console.log(`Unable to get the cart total amount for ${tabName} CTA ${i + 1}:`);
+              }
+              
+              // Take screenshot of cart page
+              await page.screenshot({ path: `screenshots/plans-${tabName.toLowerCase()}-cart-${i + 1}.png` });
+            } else {
+              // Don't check the cart total if redirected
+              cartTotalMatched = true;
+            }
+
+            const priceConsistent = originalPrice && checkoutPrice && cartTotalMatched ? true : null;
 
             allCtaResults.push({
               tab: tabName,
@@ -259,30 +288,27 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               originalPrice,
               finalUrl,
               checkoutPrice,
-              priceConsistent: originalPrice && checkoutPrice ? true : null,
+              cartTotal,
+              priceConsistent,
               navigationSuccessful: true
             });
 
-            console.log(`${tabName} CTA ${i + 1} Result: Navigated to ${finalUrl}, Price match: ${checkoutPrice ? 'Yes' : 'No'}`);
+            console.log(`${tabName} CTA ${i + 1} Result: Navigated to ${finalUrl}, Price match: ${priceConsistent ? 'Yes' : 'No'}`);
 
-            // Close new page if it was opened
             if (!finalUrl.startsWith(testUrl)) {
-              //await newPage.goto(testUrl, { waitUntil: 'networkidle' });
               try {
                 await page.goBack({ waitUntil: 'networkidle', timeout: 20000 });
               } catch (error) {
                 console.log('Timeout on waiting for netword idle!');
               }
-              ctaButtons = await plansPage.checkoutButtons.all();
             } else {
-              // Close the modal
-              let closeButton = await page.$('button[aria-label*="Close"]'); 
-              while (closeButton) {
-                await closeButton.click();
-                await page.waitForTimeout(1000);
-                closeButton = await page.$('button[aria-label*="Close"]');
-              } 
+              try {
+                await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
+              } catch (error) {
+                console.log('Timeout on waiting for netword idle!');
+              }
             }
+            ctaButtons = await plansPage.checkoutButtons.all();  
           } else {
             allCtaResults.push({
               tab: tabName,
