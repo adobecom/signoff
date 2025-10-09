@@ -47,16 +47,12 @@ class CommerceIFrame {
 
 test.describe('Creative Cloud Plans Page Monitoring', () => {
 
-  test.use({
-    userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 ${process.env.USER_AGENT_SUFFIX}`,
-  });
-
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/plans.html';
   console.log(`Testing URL: ${testUrl}`);
 
   test.beforeEach(async ({ page }) => {
     try {
-      await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
+      await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 60000 });
     } catch (err) {
       console.log('Timeout on Waiting for network idle!');
     }
@@ -256,8 +252,12 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             let cartTotalMatched = false;
             if (iframe) {
               try {
+                await expect(async () => {
                 await iframe.continue.click();
+                }).toPass();
+                await expect(async () => {
                 cartTotal = await page.locator('[class*="CartTotals__total-amount"]').textContent();
+                }).toPass();
                 if (originalPrice) {
                   console.log(`Cart total amount for ${tabName} CTA ${i + 1}:`, cartTotal);
                   if (cartTotal.replace(/[^\d.]/g, '') === originalPrice.replace(/[^\d.]/g, '')) {

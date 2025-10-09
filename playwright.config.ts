@@ -37,12 +37,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        userAgent: `${devices['Desktop Chrome'].userAgent} ${process.env.USER_AGENT_SUFFIX}`,
+      },
     },
 
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: { 
+        ...devices['Desktop Safari'],
+        userAgent: `${devices['Desktop Safari'].userAgent} ${process.env.USER_AGENT_SUFFIX}`,
+      },
     },
 
     //{

@@ -33,10 +33,6 @@ class PlansPage {
 
 test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
 
-  test.use({
-    userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 ${process.env.USER_AGENT_SUFFIX}`,
-  });
-
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/uk/creativecloud/plans.html';
   console.log(`Testing URL: ${testUrl}`);
 
