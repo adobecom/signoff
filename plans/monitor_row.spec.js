@@ -236,7 +236,7 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
               checkoutPrices = await Promise.all(checkoutPriceElements.map(async(x) => await x.textContent()));
             } else {
               finalCheckoutNode = await targetPage.locator('body');
-              const priceElements = await finalCheckoutNode.locator(':is(div.price, span[data-wcs-type="price"])').filter({visible: true}).all();
+              const priceElements = await finalCheckoutNode.locator(':is(div.price, [data-testid="card-price"], span[data-wcs-type="price"])').filter({visible: true}).all();
               checkoutPrices = await Promise.all(priceElements.map(async(x) => await x.textContent()));
             }
 
