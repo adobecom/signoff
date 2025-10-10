@@ -1,0 +1,50 @@
+name: Plans Daily Monitor on Mobile
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Test URL'
+        required: false
+        type: string
+
+jobs:
+  monitor:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            browser: safari
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run plans monitor
+        run: npx wdio wdio.conf.js
+        env:
+          TEST_URL: ${{ inputs.test_url }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: plans-monitor-results-${{ matrix.browser }}-${{ github.run_number }}
+          path: |
+            screenshots/
+          retention-days: 30
+
+
+
+
