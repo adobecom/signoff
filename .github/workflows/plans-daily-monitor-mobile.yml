@@ -33,6 +33,11 @@ jobs:
           erase_before_boot: false
           wait_for_boot: true    
 
+      - run: |
+          target_sim_id=$(xcrun simctl list devices available | grep -A 10 "Booted" | cut -d "(" -f2 | cut -d ")" -f1 | head -n 1)
+          echo "Target sim id: $target_sim_id"
+          echo "udid=$target_sim_id" >> $GITHUB_ENV
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -46,6 +51,13 @@ jobs:
           npx appium driver list
           npx appium driver doctor xcuitest
           npx appium driver run xcuitest download-wda-sim --outdir="WDA"
+          echo "WDA_PATH=WDA" >> $GITHUB_ENV
+
+      - run: |
+          echo "UDID: $udid"
+          echo "WDA path: $WDA_PATH"
+          xcrun simctl install $udid $WDA_PATH
+          xcrun simctl launch $udid "com.facebook.WebDriverAgentRunner.xctrunner"
 
       - name: Run plans monitor
         run: npx wdio wdio.conf.js
