@@ -30,6 +30,7 @@ jobs:
           model: 'iPhone 16'
           os: iOS
           os_version: '18.4'
+          erase_before_boot: false
           wait_for_boot: true    
 
       - name: Setup Node.js
@@ -41,8 +42,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Appium Doctor
-        run: npx appium-doctor
+      - run: |
+          npx appium driver list
+          npx appium driver doctor xcuitest
+          npx appium driver run xcuitest download-wda-sim --outdir="WDA"
 
       - name: Run plans monitor
         run: npx wdio wdio.conf.js
