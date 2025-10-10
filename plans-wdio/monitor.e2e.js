@@ -93,7 +93,7 @@ describe('Plans Page Monitor', () => {
           await browser.saveScreenshot(`screenshots/action-tab-${i}.png`);
         }
 
-        await browser.keys('Enter');
+        await browser.keys('Return');
         await browser.pause(10000);
         await browser.saveScreenshot(`screenshots/action-enter.png`);
         
