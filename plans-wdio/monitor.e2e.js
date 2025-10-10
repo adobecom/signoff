@@ -29,7 +29,7 @@ describe('Plans Page Monitor', () => {
 
         console.log(`Price: ${cardPrice}`);
 
-        await browser.saveScreenshot("screenshots/before.png");
+        await browser.saveScreenshot('screenshots/before.png');
 
         // Click the "Select" button on the first merch card
         let selectButton = await firstMerchCard.$('[is="checkout-link"]');
@@ -50,7 +50,7 @@ describe('Plans Page Monitor', () => {
         await modal.waitForDisplayed();
         await modal.scrollIntoView({ block: 'center' });
 
-        await browser.saveScreenshot("screenshots/options.png");
+        await browser.saveScreenshot('screenshots/options.png');
 
         // Check price options in the modal and verify one matches the card price
         const priceOptions = await $$('[data-testid="main-price"]');
@@ -90,18 +90,20 @@ describe('Plans Page Monitor', () => {
         for (let i = 0; i < buttonIndex-1; i++) {
           await browser.keys('Tab');
           await browser.pause(1000);
+          await browser.saveScreenshot(`screenshots/action-tab-${i}.png`);
         }
 
         await browser.keys('Enter');
         await browser.pause(10000);
-    
+        await browser.saveScreenshot(`screenshots/action-enter.png`);
+        
         // Verify the price in the shopping cart
         const cartPrice = await $('[class*="CartTotals__total-amount"]');
         await cartPrice.waitForDisplayed({ timeout: 60000, interval: 3000 });
         await cartPrice.scrollIntoView({ block: 'center' });
         await browser.pause(1000); 
 
-        await browser.saveScreenshot("screenshots/cart.png");
+        await browser.saveScreenshot(`screenshots/cart.png`);
 
         const cartPriceText = await cartPrice.getText();
         expect(cartPriceText.replace(/[^\d.,]/g, '')).toBe(cardPrice.replace(/[^\d.,]/g, ''));        
