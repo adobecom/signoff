@@ -87,22 +87,17 @@ describe('Plans Page Monitor', () => {
         await browser.pause(5000);      
         await (await $('.milo-iframe iframe')).waitForDisplayed();
 
+        await browser.pause(1000);
+
         // Use tabs to go to continue button
         for (let i = 0; i < buttonIndex-1; i++) {
-          await browser.keys(['Tab']);
+          await browser.keys(Key.Tab);
           await browser.pause(1000);
           await browser.saveScreenshot(`screenshots/action-tab-${i}.png`);
         }
         
         await browser.pause(1000);
-        await browser.performActions([{
-          type: 'key',
-          id: 'keyboard',
-          actions: [
-            { type: 'keyDown', value: Key.Enter }, 
-            { type: 'keyUp', value: Key.Enter },
-          ],
-        }]);
+        await browser.keys(Key.Enter);
         await browser.pause(10000);
         await browser.saveScreenshot(`screenshots/action-enter.png`);        
         
