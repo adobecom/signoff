@@ -92,14 +92,24 @@ describe('Plans Page Monitor', () => {
           await browser.pause(1000);
           await browser.saveScreenshot(`screenshots/action-tab-${i}.png`);
         }
-
-        await browser.keys('Return');
-        await browser.pause(10000);
-        await browser.saveScreenshot(`screenshots/action-enter.png`);
         
         // Verify the price in the shopping cart
-        const cartPrice = await $('[class*="CartTotals__total-amount"]');
-        await cartPrice.waitForDisplayed({ timeout: 60000, interval: 3000 });
+        let retry = 2;
+        let cartPrice;
+        while (retry > 0) {
+          await browser.keys('Return');
+          await browser.pause(10000);
+          await browser.saveScreenshot(`screenshots/action-enter.png`);
+          try {
+            cartPrice = await $('[class*="CartTotals__total-amount"]');
+            await cartPrice.waitForDisplayed({ timeout: 60000, interval: 3000 });
+            break;
+          } catch (err) {
+            console.log('Retry continue');
+            retry -= 1;
+          }
+        }
+
         await cartPrice.scrollIntoView({ block: 'center' });
         await browser.pause(1000); 
 
