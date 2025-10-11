@@ -94,7 +94,7 @@ describe('Plans Page Monitor', () => {
         }
         
         await browser.pause(1000);
-        await browser.keys(['Space']);
+        await browser.execute('mobile: keys', { keys: ['\n'] });
         await browser.pause(10000);
         await browser.saveScreenshot(`screenshots/action-enter.png`);        
         
