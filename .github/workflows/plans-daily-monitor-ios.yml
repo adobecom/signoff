@@ -1,4 +1,4 @@
-name: Plans Daily Monitor on Mobile
+name: Plans Daily Monitor on iOS
 
 on:
   workflow_dispatch:
@@ -65,7 +65,7 @@ jobs:
           xcrun simctl launch $udid "com.facebook.WebDriverAgentRunner.xctrunner"
 
       - name: Run plans monitor
-        run: npx wdio wdio.conf.js
+        run: npx wdio wdio-ios.conf.js
         env:
           TEST_URL: ${{ inputs.test_url }}
 
