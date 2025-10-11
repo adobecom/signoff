@@ -88,13 +88,13 @@ describe('Plans Page Monitor', () => {
 
         // Use tabs to go to continue button
         for (let i = 0; i < buttonIndex-1; i++) {
-          await browser.keys('Tab');
+          await browser.keys(['Tab']);
           await browser.pause(1000);
           await browser.saveScreenshot(`screenshots/action-tab-${i}.png`);
         }
         
         await browser.pause(1000);
-        await browser.keys('Return');
+        await browser.keys(['Space']);
         await browser.pause(10000);
         await browser.saveScreenshot(`screenshots/action-enter.png`);        
         
