@@ -56,7 +56,8 @@ exports.config = {
         browserName: 'Safari',
         'appium:deviceName': 'iPhone 16',
         'appium:platformVersion': '18.4',
-        'appium:automationName': 'XCUITest'
+        'appium:automationName': 'XCUITest',
+        'appium:connectHardwareKeyboard': true
     }],
 
     //
