@@ -57,7 +57,7 @@ jobs:
             adb devices
             npx appium driver list
             mkdir -p ${{ github.workspace }}/log
-            adb logcat > ${{ github.workspace }}/log/adblogcat.txt
+            adb logcat > ${{ github.workspace }}/log/adblogcat.txt &
             npx wdio wdio-android.conf.js
         env:
           TEST_URL: ${{ inputs.test_url }}
