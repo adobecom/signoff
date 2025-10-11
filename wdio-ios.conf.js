@@ -55,13 +55,8 @@ exports.config = {
         platformName: 'iOS',
         browserName: 'Safari',
         'appium:deviceName': 'iPhone 16',
-        'appium:platformVersion': '18.0',
+        'appium:platformVersion': '18.4',
         'appium:automationName': 'XCUITest'
-    }, {
-        platformName: 'Android',
-        'appium:platformName': 'Android',
-        'appium:platformVersion': '13',
-        'appium:automationName': 'UiAutomator2',  
     }],
 
     //
