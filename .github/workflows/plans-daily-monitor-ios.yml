@@ -76,6 +76,7 @@ jobs:
           name: plans-monitor-results-${{ matrix.browser }}-${{ github.run_number }}
           path: |
             screenshots/
+            log/
           retention-days: 30
 
 

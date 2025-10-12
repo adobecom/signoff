@@ -96,8 +96,7 @@ describe('Plans Page Monitor', () => {
           await browser.saveScreenshot(`screenshots/action-tab-${i}.png`);
         }
         
-        await browser.pause(1000);
-        await browser.keys([Key.Control, 'm']);
+        await browser.keys(Key.Return);
         await browser.pause(10000);
         await browser.saveScreenshot(`screenshots/action-enter.png`);        
         
