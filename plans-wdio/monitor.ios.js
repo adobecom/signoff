@@ -97,7 +97,7 @@ describe('Plans Page Monitor', () => {
         }
         
         await browser.pause(1000);
-        await browser.keys(Key.Enter);
+        await browser.keys([Key.Control, 'm']);
         await browser.pause(10000);
         await browser.saveScreenshot(`screenshots/action-enter.png`);        
         
