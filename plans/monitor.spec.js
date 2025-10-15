@@ -16,7 +16,9 @@ class PlansPage {
       'Students & Teachers': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Students & Teachers']}"]`),
       'Schools & Universities': page.locator(`[role="tab"][data-deeplink="${this.tabKeys['Schools & Universities']}"]`),
     }
+    this.merchCards = page.locator('merch-card').filter({ visible: true });
     this.checkoutButtons = page.locator('.tabpanel:not([hidden]) a.button[is="checkout-link"]').filter({ visible: true });
+    this.addonsCheckboxes = page.locator('merch-addon[slot="addon"]').filter({visible: true});
     this.cardSelector = 'merch-card';
     this.miloIframe = page.locator('div.milo-iframe iframe').filter({visible: true});
     this.panel3in1Selector = '#three-in-one-side-panel';
@@ -52,7 +54,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   test.beforeEach(async ({ page }) => {
     try {
-      await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 60000 });
+      await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
     } catch (err) {
       console.log('Timeout on Waiting for network idle!');
     }
@@ -366,4 +368,249 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     }
   });
 
+  test('should test Adobe Stock add-on', async ({ page }) => {
+    test.setTimeout(600 * 1000);
+
+    const plansPage = new PlansPage(page);
+
+    const testUrl = await page.url();
+
+    const addonLocator = 'merch-addon[slot="addon"]';
+    const headerLocator = 'h3';
+    const priceLocator = 'span[is="inline-price"][data-template="price"]';
+    const checkoutLinkLocator = 'a.button[is="checkout-link"]';
+    const miloIframeLocator = '.milo-iframe iframe';
+    const modalSelectedPriceLocator = '[data-testid="is-selected"] [data-testid="main-price"]';
+    const modalAddonPriceLocator = '[data-testid="inline-addon-description"] [data-testid="price-full-display"]';
+    const modalAddonLocator = 'input[data-testid="inline-addon-checkbox"]';
+    const modalContinueLocator = 'button[data-testid="primary-cta-button"]';
+    const fullPriceLocator = 'div[data-testid="cart-totals-subtotals-row"] div[data-testid="price-full-display"]';
+
+    await plansPage.pageLoadOk.waitFor({ state: 'attached', timeout: 20000 });
+
+    // Find all merch cards
+    let allMerchCards = await plansPage.merchCards.all();
+    console.log(`Found ${allMerchCards.length} total merch cards`);
+
+    // Filter merch cards that contain addon checkboxes
+    const merchCardsWithAddons = [];
+    
+    for (const merchCard of allMerchCards) {
+      const hasAddon = await merchCard.locator(addonLocator).count() > 0;
+      if (hasAddon) {
+        merchCardsWithAddons.push(merchCard);
+      }
+    }
+
+    console.log(`Found ${merchCardsWithAddons.length} merch cards with addon checkboxes`);
+
+    const addonLength = merchCardsWithAddons.length;
+    const errors = [];
+    const results = [];
+
+    // Test each merch card with addons
+    for (let i = 0; i < addonLength; i++) {
+      const merchCard = merchCardsWithAddons[i];
+      
+      try {
+        console.log(`\n=== Testing merch card ${i + 1} with addons ===`);
+        
+        const header = await merchCard.locator(headerLocator).first().textContent();
+        console.log(header);
+
+        // Find addon checkbox within this merch card
+        const addonCheckbox = await merchCard.locator(addonLocator).first();
+        
+        // Get the price before clicking addon
+        const originalPrice = await merchCard.locator(priceLocator).filter({visible: true}).textContent();
+        const originalPriceNum = parseFloat(originalPrice.replace(/[^\d.]/g, ''));
+        console.log(`Original price: ${originalPrice || 'Not found'}`);
+        
+        // Scroll into view and click the checkbox inside the shadow root
+        await addonCheckbox.scrollIntoViewIfNeeded();
+        await addonCheckbox.evaluate(el => {
+          const shadowRoot = el.shadowRoot;
+          if (shadowRoot) {
+            const checkbox = shadowRoot.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+              checkbox.click();
+            }
+          }
+        });
+        await page.waitForTimeout(2000);
+        
+        await merchCard.screenshot({ 
+          path: `screenshots/addon-merch-card-${i + 1}.png`,
+        });
+
+        // Find and click checkout button within this merch card
+        const checkoutButton = merchCard.locator(checkoutLinkLocator).first();
+        
+        if (checkoutButton) {
+          console.log(`Clicking checkout button for merch card ${i + 1}`);
+          await checkoutButton.click();
+          
+          await page.waitForTimeout(3000);
+
+          await page.locator(miloIframeLocator).waitFor({state: 'visible', timeout: 20000});
+
+          const iframe = await page.locator(miloIframeLocator).contentFrame();
+
+          const selectedPrice = await iframe.locator(modalSelectedPriceLocator).filter({visible: true}).first();
+          const selectedPriceText = await selectedPrice.textContent();
+          const selectedPriceNum = parseFloat(selectedPriceText.replace(/[^\d.]/g, ''));
+          console.log(`Selected price: ${selectedPriceText}`);
+
+          if (selectedPriceNum !== originalPriceNum) {
+            errors.push({
+              card: i + 1,
+              header,
+              error: 'Selected price does not match original price'
+            });
+            console.log(`✗ Selected price does not match original price for card ${i + 1}`);
+          }
+
+          const addonPrice = await iframe.locator(modalAddonPriceLocator).filter({visible: true}).first();
+          const addonPriceText = await addonPrice.textContent();
+          const addonPriceNum = parseFloat(addonPriceText.replace(/[^\d.]/g, ''));
+          console.log(`Addon price: ${addonPriceText}`);
+          
+          const checkbox = await iframe.locator(modalAddonLocator).first();
+
+          // Take screenshot after checkout
+          await page.screenshot({ 
+            path: `screenshots/addon-checkout-${i + 1}.png`,
+          });
+
+          // Check if checkbox is checked
+          const isChecked = await checkbox.isChecked();
+          if (!isChecked) {
+            errors.push({
+              card: i + 1,
+              header,
+              error: 'Addon checkbox is not checked in modal'
+            });
+            console.log(`✗ Addon checkbox is not checked in modal for card ${i + 1}`);
+          }
+   
+          const continueButton = await iframe.locator(modalContinueLocator).filter({visible: true}).first();
+          
+          // Wait for button to be enabled
+          try {
+            await continueButton.waitFor({ state: 'visible', timeout: 10000 });
+            await expect(continueButton).toBeEnabled({ timeout: 10000 });
+            await continueButton.click();
+          } catch (error) {
+            errors.push({
+              card: i + 1,
+              header,
+              error: `Continue button did not become enabled: ${error.message}`
+            });
+            console.log(`✗ Continue button did not become enabled for card ${i + 1}: ${error.message}`);
+            continue; // Skip to next card
+          }
+
+          await page.waitForTimeout(3000);
+          
+          const fullPrice = await page.locator(fullPriceLocator).filter({visible: true}).first();
+          const fullPriceText = await fullPrice.textContent();
+          const fullPriceNum = parseFloat(fullPriceText.replace(/[^\d.]/g, ''));
+          
+          console.log(`Full Price in cart: ${fullPriceText}`);
+
+          await page.screenshot({ 
+            path: `screenshots/addon-cart-${i + 1}.png`,
+          });
+
+           // check the full price in cart equals original price + $29.99 addon
+
+           const expectedPrice = originalPriceNum + addonPriceNum;
+           
+           if (Math.abs(fullPriceNum - expectedPrice) < 0.01) {
+             console.log(`✓ Full price in cart (${fullPriceText}) correctly equals original price (${originalPrice}) + $29.99 addon for card ${i + 1}`);
+             results.push({
+               card: i + 1,
+               header,
+               originalPrice,
+               fullPrice: fullPriceText,
+               success: true
+             });
+           } else {
+             const errorMsg = `Price mismatch: Expected ${expectedPrice.toFixed(2)}, got ${fullPriceText} (original: ${originalPrice})`;
+             console.log(`✗ ${errorMsg} for card ${i + 1}`);
+             errors.push({
+               card: i + 1,
+               header,
+               error: errorMsg
+             });
+             results.push({
+               card: i + 1,
+               header,
+               originalPrice,
+               fullPrice: fullPriceText,
+               expectedPrice: expectedPrice.toFixed(2),
+               success: false
+             });
+           }
+
+        } else {
+          const errorMsg = 'No checkout button found';
+          console.log(`✗ ${errorMsg} in merch card ${i + 1}`);
+          errors.push({
+            card: i + 1,
+            header: header || 'Unknown',
+            error: errorMsg
+          });
+        }
+        
+      } catch (error) {
+        console.log(`✗ Error testing merch card ${i + 1}:`, error.message);
+        errors.push({
+          card: i + 1,
+          header: 'Unknown',
+          error: error.message
+        });
+      } finally {
+        await page.goto(testUrl);
+        const plansPage = new PlansPage(page);
+        await plansPage.pageLoadOk.waitFor({ state: 'attached', timeout: 20000 });
+        allMerchCards = await plansPage.merchCards.all();
+        
+        merchCardsWithAddons.length = 0;
+
+        for (const merchCard of allMerchCards) {
+          const hasAddon = await merchCard.locator(addonLocator).count() > 0;
+          if (hasAddon) {
+            merchCardsWithAddons.push(merchCard);
+          }
+        }
+      }
+    }
+
+    // Report summary at the end
+    console.log(`\n=== Test Summary ===`);
+    console.log(`Total cards tested: ${addonLength}`);
+    console.log(`Successful: ${results.filter(r => r.success).length}`);
+    console.log(`Failed: ${errors.length}`);
+
+    if (results.length > 0) {
+      console.log(`\n=== Successful Tests ===`);
+      results.filter(r => r.success).forEach(result => {
+        console.log(`Card ${result.card} (${result.header}): ${result.originalPrice} → ${result.fullPrice}`);
+      });
+    }
+
+    if (errors.length > 0) {
+      console.log(`\n=== Failed Tests ===`);
+      errors.forEach(error => {
+        console.log(`Card ${error.card} (${error.header}): ${error.error}`);
+      });
+      
+      // Fail the test with all errors
+      expect(errors.length).toBe(0);
+    }
+
+    // Verify we found at least one merch card with addons
+    expect(addonLength).toBeGreaterThan(0);
+  });
 });
