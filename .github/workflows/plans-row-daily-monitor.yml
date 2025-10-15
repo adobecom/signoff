@@ -86,7 +86,7 @@ jobs:
     needs: filter-matrix
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.filter-matrix.outputs.matrix) }}
