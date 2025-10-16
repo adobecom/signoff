@@ -56,43 +56,39 @@ jobs:
 
       - name: Slack notification on success
         if: success()
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "✅ Plans US Monitor 🇺🇸 - SUCCESS",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*✅ Plans US Monitor 🇺🇸 - SUCCESS*\n*OS:* ${{ matrix.os }}\n*Browser:* ${{ matrix.browser }}\n*Test URL:* https://www.adobe.com/creativecloud/plans.html\n*View details:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  }
-                }
-              ]
-            }
+        uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_COLOR: good
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans US Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_TITLE: ✅ Plans US Monitor 🇺🇸 - SUCCESS
+          SLACK_MESSAGE: |
+            OS: ${{ matrix.os }}
+            Browser: ${{ matrix.browser }}
+            Test URL: https://www.adobe.com/creativecloud/plans.html
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
       - name: Slack notification on failure
         if: failure()
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "❌ Plans US Monitor 🇺🇸 - FAILURE",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*❌ Plans US Monitor 🇺🇸 - FAILURE*\n*OS:* ${{ matrix.os }}\n*Browser:* ${{ matrix.browser }}\n*Test URL:* https://www.adobe.com/creativecloud/plans.html\n*View details:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  }
-                }
-              ]
-            }
+        uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          SLACK_CHANNEL: loot-loaders-alerts
+          SLACK_COLOR: danger
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans US Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_TITLE: ❌ Plans US Monitor 🇺🇸 - FAILURE
+          SLACK_MESSAGE: |
+            OS: ${{ matrix.os }}
+            Browser: ${{ matrix.browser }}
+            Test URL: https://www.adobe.com/creativecloud/plans.html
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
