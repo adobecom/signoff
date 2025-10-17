@@ -128,7 +128,7 @@ jobs:
         if: success()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: loot-loader-tests
+          SLACK_CHANNEL: loot-loaders-tests
           SLACK_COLOR: good
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Plans ROW Monitor
@@ -145,7 +145,7 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: loot-loader-alerts
+          SLACK_CHANNEL: loot-loaders-alerts
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Plans ROW Monitor
