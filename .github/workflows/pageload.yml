@@ -79,7 +79,7 @@ jobs:
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run the tests
-        run: npx playwright test test/pageload.spec.js --workers ${{ inputs.workers }}
+        run: npx playwright test test/pageload.spec.js --workers ${{ inputs.workers }} --project=chromium
         env:
           GIST_URLS: ${{ inputs.gist_urls }}
           REQUEST_DELAY: ${{ inputs.delay }}
