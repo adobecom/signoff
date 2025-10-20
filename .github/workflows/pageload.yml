@@ -127,7 +127,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run the tests
-        run: npx playwright test test/pageload.spec.js --workers ${{ inputs.workers }}
+        run: npx playwright test test/pageload.spec.js --workers ${{ inputs.workers }} --project=chromium
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           GIST_URLS: ${{ inputs.gist_urls }}
