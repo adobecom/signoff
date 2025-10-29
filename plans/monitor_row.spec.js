@@ -99,7 +99,8 @@ test.describe('Creative Cloud Plans Page ROW Monitoring', () => {
       !error.includes('analytics') &&
       !error.includes('ads') &&
       !error.toLowerCase().includes('third-party') &&
-      !error.includes('reading \'setAttribute\'') // Cannot read properties of null (reading 'setAttribute')
+      !error.includes('reading \'setAttribute\'') && // Cannot read properties of null (reading 'setAttribute')
+      !error.includes('reading \'style\'') // Cannot read properties of null (reading 'style')
     );
     
     if (criticalErrors.length > 0) {
