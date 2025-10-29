@@ -1,0 +1,84 @@
+name: Teams Daily Monitor
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Test URL'
+        required: false
+        type: string
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run teams monitor
+        run: npx playwright test teams/monitor.spec.js --project=chromium
+        env:
+          TEST_URL: ${{ inputs.test_url }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: teams-monitor-results-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+          retention-days: 30
+
+      - name: Slack notification on success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_COLOR: good
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Teams US Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_TITLE: ✅ Teams US Monitor 🇺🇸 - SUCCESS
+          SLACK_MESSAGE: |
+            Test URL: https://www.adobe.com/creativecloud/business/teams.html
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Slack notification on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_COLOR: danger
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Teams US Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: |
+            Test URL: https://www.adobe.com/creativecloud/business/teams.html
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TITLE: ❌ Teams US Monitor 🇺🇸 - FAILURE
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
