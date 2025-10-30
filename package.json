@@ -35,7 +35,6 @@
     "@wdio/spec-reporter": "^9.20.0",
     "appium": "^3.1.0",
     "appium-xcuitest-driver": "^10.1.6",
-    "appium-uiautomator2-driver": "^5.0.5",
-    "browserstack-node-sdk": "^1.45.3"
+    "appium-uiautomator2-driver": "^5.0.5"
   }
 }
