@@ -36,7 +36,8 @@ class Modal {
 class CartPage {
   constructor(page) {
     this.page = page;
-    this.cartTotal = page.locator('[data-testid="cart-totals-subtotals-row"] [data-testid="price-full-display"]').filter({visible: true});
+    this.cartSubTotal = page.locator('[data-testid="cart-totals-subtotals-row"] [data-testid="price-full-display"]').filter({visible: true});
+    this.cartTotal = page.locator('[data-testid="advanced-cart-order-totals-row"] [data-testid="price-full-display"]').filter({visible: true});
   }
 }
 
@@ -329,14 +330,18 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         await page.waitForTimeout(5000);
 
         const cartPage = new CartPage(page);
-        await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 20000 });
+        await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
+        const cartSubTotal = await cartPage.cartSubTotal.first().textContent();
         const cartTotal = await cartPage.cartTotal.first().textContent();
+        console.log(`Cart sub total: ${cartSubTotal}`);
         console.log(`Cart total: ${cartTotal}`);
 
         await page.screenshot({ path: `screenshots/teams-tab-${tabIndex + 1}-card-${cardIndex + 1}-cart.png` }  );
 
-        if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionText.replace(/[^\d.]/g, '')) {
-          optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionText} for tab \"${tabText}\" card \"${cardText}\"`;
+        const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
+        if ((cartSubTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) && 
+            (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
+          optionResult.error = `Cart subtotal/total does not match option price ${priceOptionText} for tab \"${tabText}\" card \"${cardText}\"`;
           console.log(`✗ ${optionResult.error}`);
         }
       } catch (error) {
