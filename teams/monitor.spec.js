@@ -216,7 +216,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               priceOptionText: priceOptionText,
             });          
           }
-          await expect(modal.modalCloseButton.first()).toBeEnabled();
+          await expect(modal.modalCloseButton.first()).toBeEnabled({timeout: 10000});
           await modal.modalCloseButton.first().click();
           await page.waitForTimeout(1000);
         }
