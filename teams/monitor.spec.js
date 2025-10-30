@@ -39,6 +39,7 @@ class CartPage {
     this.cartTotal = page.locator('[class*="CartTotals__total-amount-plus-tax"] [data-testid="price-full-display"]').filter({visible: true});
   }
 }
+
 test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/business/teams.html';
@@ -107,7 +108,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     });
   });
 
-  test('should click and verify all tabs', async ({ page }) => {
+  test('should click and verify all merch cards', async ({ page }) => {
     test.setTimeout(1200 * 1000);
 
     const teamsPage = new TeamsPage(page);
