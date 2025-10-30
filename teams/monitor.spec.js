@@ -33,6 +33,12 @@ class Modal {
   }
 }
 
+class CartPage {
+  constructor(page) {
+    this.page = page;
+    this.cartTotal = page.locator('[class*="CartTotals__total-amount-plus-tax"] [data-testid="price-full-display"]').filter({visible: true});
+  }
+}
 test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/business/teams.html';
@@ -102,8 +108,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
   });
 
   test('should click and verify all tabs', async ({ page }) => {
-    test.setTimeout(600 * 1000);
-    
+    test.setTimeout(1200 * 1000);
+
     const teamsPage = new TeamsPage(page);
     
     // Find all tab elements - adjust selector based on actual page structure
@@ -114,6 +120,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     // Track which tabs were successfully clicked
     const optionResults = [];
     const cardErrors = [];
+    const cardSet = new Set();
 
     for (let i = 0; i < tabs.length; i++) {
       const tab = tabs[i];
@@ -154,7 +161,15 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           // Find the parent element that is merch-card
           const merchCard = new MerchCard(card);
-          const productName = await merchCard.productName.first()?.textContent();
+          await merchCard.productName.first().waitFor({state: 'visible', timeout: 10000});
+          const productName = await merchCard.productName.first().textContent();
+
+          if (cardSet.has(productName)) {
+            console.log(`Duplicate card found: ${productName}`);
+            continue;
+          }
+          cardSet.add(productName);
+
           const checkoutLinkExists = await merchCard.checkoutLink.count() > 0;
           if (checkoutLinkExists) {
             console.log(`Clicking checkout link for ${productName}`);
@@ -236,6 +251,78 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     if (cardErrors.length > 0) {
       console.log(`Card errors: ${cardErrors.map(error => error.error).join('\n')}`);
       expect(cardErrors.length).toBe(0);
+    }
+
+    console.log(`Check out price options: ${optionResults.length}`);
+
+    for (const optionResult of optionResults) {
+      const tabIndex = optionResult.tabIndex;
+      const tabText = optionResult.tabText;
+      const cardIndex = optionResult.cardIndex;
+      const cardText = optionResult.cardText;
+      const optionIndex = optionResult.optionIndex;
+      const priceOptionText = optionResult.priceOptionText;
+      
+      try {
+        console.log(`Tab index: ${tabIndex}`);
+        console.log(`Tab text: ${tabText}`);
+        console.log(`Card index: ${cardIndex}`);
+        console.log(`Card text: ${cardText}`);
+        console.log(`Option index: ${optionIndex}`);
+        console.log(`Price option text: ${priceOptionText}`);
+
+        await page.goto(testUrl);
+        const teamsPage = new TeamsPage(page);
+        await teamsPage.pageLoadOk.waitFor({ state: 'attached', timeout: 20000 });
+
+        await teamsPage.tabs.nth(tabIndex).click();
+        await page.waitForTimeout(1000);
+        const tabPanel = teamsPage.tabPanel.first();
+        await tabPanel.waitFor({ state: 'visible', timeout: 10000 });
+        
+        const merchCard = new MerchCard(teamsPage.merchCards.nth(cardIndex));
+        await merchCard.productName.waitFor({ state: 'visible', timeout: 10000 });
+
+        await merchCard.checkoutLink.first().waitFor({ state: 'visible', timeout: 10000 });
+        await expect(merchCard.checkoutLink.first()).toBeEnabled({timeout: 10000});
+        await merchCard.checkoutLink.first().click();
+        await page.waitForTimeout(5000);
+
+        const iframe = await teamsPage.modalIframe.contentFrame();
+        const modal = new Modal(iframe);
+        await modal.priceOptions.nth(optionIndex).waitFor({ state: 'visible', timeout: 10000 });
+        const option = await modal.priceOptions.nth(optionIndex);
+        expect(option).toBeVisible({timeout: 10000});
+        await option.click();
+        await page.waitForTimeout(1000);
+        
+        expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
+        await modal.continueButton.first().click();
+        await page.waitForTimeout(5000);
+
+        const cartPage = new CartPage(page);
+        await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 20000 });
+        const cartTotal = await cartPage.cartTotal.first().textContent();
+        console.log(`Cart total: ${cartTotal}`);
+
+        await page.screenshot({ path: `screenshots/teams-tab-${tabIndex + 1}-card-${cardIndex + 1}-cart.png` }  );
+
+        if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionText.replace(/[^\d.]/g, '')) {
+          optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionText} for tab \"${tabText}\" card \"${cardText}\"`;
+          console.log(`✗ ${optionResult.error}`);
+        }
+      } catch (error) {
+        console.log(`Error processing option result: ${error.message}`);
+        await page.screenshot({ path: `screenshots/teams-tab-${tabIndex + 1}-card-${cardIndex + 1}-error.png` });
+        optionResult.error = `Error processing option result: ${error.message}`;
+        console.log(`✗ ${optionResult.error}`);
+      }
+    }
+
+    const errorResults = optionResults.filter(result => result.error);
+    if (errorResults.length > 0) {
+      console.log(`Option results: ${errorResults.map(result => result.error).join('\n')}`);
+      await expect(errorResults.length).toBe(0);
     }
   });
 });
