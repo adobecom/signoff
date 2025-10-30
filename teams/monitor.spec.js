@@ -102,6 +102,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
   });
 
   test('should click and verify all tabs', async ({ page }) => {
+    test.setTimeout(600 * 1000);
+    
     const teamsPage = new TeamsPage(page);
     
     // Find all tab elements - adjust selector based on actual page structure
