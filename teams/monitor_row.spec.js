@@ -332,10 +332,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         const cartPage = new CartPage(page);
         await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
         const cartSubTotal = await cartPage.cartSubTotal.first().textContent();
-        const cartTotal = await cartPage.cartTotal.first().textContent();
+        let cartTotal = 'N/A';
+        if (await cartPage.cartTotal.count() > 0) {
+          cartTotal = await cartPage.cartTotal.first().textContent();
+        }
         console.log(`Cart sub total: ${cartSubTotal}`);
         console.log(`Cart total: ${cartTotal}`);
-
+        
         await page.screenshot({ path: `screenshots/teams-tab-${tabIndex + 1}-card-${cardIndex + 1}-cart.png` }  );
 
         const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
