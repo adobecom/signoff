@@ -81,7 +81,7 @@ jobs:
         with:
           payload: |
             {
-              "channel": "loot-loaders-alerts",
+              "channel": "loot-loaders-tests",
               "username": "Plans US Monitor",
               "icon_url": "https://github.com/actions.png?size=48",
               "attachments": [
