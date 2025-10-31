@@ -1,0 +1,159 @@
+name: Plans ROW Daily Monitor 2
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+    - cron: '0 3 * * *'
+    - cron: '0 4 * * *'
+    - cron: '0 5 * * *'
+    - cron: '0 6 * * *'
+    - cron: '0 7 * * *'
+    - cron: '0 8 * * *'
+    - cron: '0 9 * * *'
+    - cron: '0 14 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 16 * * *'
+    - cron: '0 17 * * *'
+    - cron: '0 18 * * *'
+    - cron: '0 19 * * *'
+    - cron: '0 20 * * *'
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Test URL (overrides locale selection)'
+        required: false
+        type: string
+      locale:
+        description: 'Locale to test (leave empty to test all)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - 'UK'
+          - 'Japan'
+          - 'Germany'
+          - 'France'
+          - 'Spain'
+          - 'Italy'
+          - 'India'
+          - 'Brazil'
+      test_tabs:
+        description: 'Test Tabs'
+        required: false
+        type: string
+
+jobs:
+  filter-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          CURRENT_HOUR=$(date -u +%H)
+
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            # Run only the locale matching the current hour
+            case "$CURRENT_HOUR" in
+              "02"|"14") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
+              "03"|"15") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
+              "04"|"16") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"}]}' >> $GITHUB_OUTPUT ;;
+              "05"|"17") echo 'matrix={"include":[{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"}]}' >> $GITHUB_OUTPUT ;;
+              "06"|"18") echo 'matrix={"include":[{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"}]}' >> $GITHUB_OUTPUT ;;
+              "07"|"19") echo 'matrix={"include":[{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
+              "08"|"20") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
+              "09"|"21") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
+            esac
+          elif [ "${{ inputs.locale }}" == "" ]; then
+            # Manual trigger with no locale: run all
+            echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT
+          else
+            # Manual trigger with specific locale
+            case "${{ inputs.locale }}" in
+              "UK") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
+              "Japan") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
+              "Germany") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"}]}' >> $GITHUB_OUTPUT ;;
+              "France") echo 'matrix={"include":[{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"}]}' >> $GITHUB_OUTPUT ;;
+              "Spain") echo 'matrix={"include":[{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"}]}' >> $GITHUB_OUTPUT ;;
+              "Italy") echo 'matrix={"include":[{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
+              "India") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
+              "Brazil") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
+            esac
+          fi
+
+  monitor:
+    needs: filter-matrix
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.filter-matrix.outputs.matrix) }}
+    env:
+      TEST_URL: ${{ github.event.inputs.test_url || matrix.url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run plans ROW monitor
+        run: npx playwright test plans/monitor_row2.spec.js --project=chromium
+        env:
+          TEST_TABS: ${{ inputs.test_tabs }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: plans-row-monitor-${{ matrix.locale }}-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+          retention-days: 30
+
+      - name: Slack notification on success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_COLOR: good
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans ROW Monitor 2
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_TITLE: ✅ Plans ROW Monitor (${{ matrix.locale }}) - SUCCESS
+          SLACK_MESSAGE: |
+            Test URL: ${{ env.TEST_URL }}
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Slack notification on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_COLOR: danger
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans ROW Monitor 2
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: |
+            Test URL: ${{ env.TEST_URL }}
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TITLE: ❌ Plans ROW Monitor (${{ matrix.locale }}) - FAILURE
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
