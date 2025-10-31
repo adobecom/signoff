@@ -23,7 +23,7 @@ class PlansPage {
 class MerchCard {
   constructor(card) {
     this.card = card;
-    this.productName = card.locator('h3');
+    this.productName = card.locator('.title h3');
     this.price = card.locator('span[data-wcs-type="price"]').filter({visible: true});
     this.checkoutLink = card.locator('.dexter-Cta .spectrum-Button--cta').filter({visible: true});
   }
