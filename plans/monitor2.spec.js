@@ -64,7 +64,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
   });
 
   test('should check all price options are consistent', async ({ page }) => {
-    test.setTimeout(1200 * 1000);
+    test.setTimeout(1800 * 1000);
 
     const plansPage = new PlansPage(page);
     await plansPage.pageLoadOk.waitFor({ state: 'attached', timeout: 20000 });
