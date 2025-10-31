@@ -174,12 +174,18 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
           await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
 
-          await modal.selectedPriceOption.waitFor({ state: 'visible', timeout: 10000 });
+          await modal.selectedPriceOption.first().waitFor({ state: 'visible', timeout: 10000 });
+          if (await modal.selectedPriceOption.count() > 1) {
+            const selectedPriceOptions = await modal.selectedPriceOption.all();
+            const prices = await Promise.all(selectedPriceOptions.map(async(x) => await x.textContent()));
+            cardResult.error = `Two or more prices ${prices.join(', ')} in an option found for tab \"${tabTitle}\" card \"${productName}\"`;
+            console.log(`✗ ${cardResult.error}`);
+          }
           const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
           console.log(`Selected price option: ${selectedPriceOption}`);
-          if (selectedPriceOption.replace(/[^\d.]/g, '') !== cardPrice.replace(/[^\d.]/g, '')) {
+          if (selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
             cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
-            console.log(`✗ ${optionResult.error}`);
+            console.log(`✗ ${cardResult.error}`);
           }
           
           const priceOptions = await modal.priceOptions.all();
