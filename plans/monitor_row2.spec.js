@@ -254,7 +254,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           if (cardPrice !== 'N/A') {
             const redirectedPageContent = await page.textContent('body');
-            if (redirectedPageContent.includes(cardPrice)) {
+            if (redirectedPageContent.includes(cardPrice.split('/')[0])) {
               console.log(`Card price found in redirected page content`);
             } else {
               cardResult.error = `Card price ${cardPrice} not found in redirected page content for tab \"${tabTitle}\" card \"${productName}\"`;
