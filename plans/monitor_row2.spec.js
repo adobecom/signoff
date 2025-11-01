@@ -44,7 +44,7 @@ class CartPage {
   constructor(page) {
     this.page = page;
     this.cartSubTotal = page.locator('[data-testid="cart-totals-subtotals-row"] [data-testid="price-full-display"]').filter({visible: true});
-    this.cartTotal = page.locator('[data-testid="advanced-cart-order-totals-row"] [data-testid="price-full-display"]').filter({visible: true});
+    this.cartTotal = page.locator('[class*="CartTotals__cart-totals-total-price"] [data-testid="price-full-display"]').filter({visible: true});
   }
 }
 
