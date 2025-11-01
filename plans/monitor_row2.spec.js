@@ -116,14 +116,15 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         const merchCard = new MerchCard(merchCards[j]);
         await merchCard.productName.first().waitFor({ state: 'visible', timeout: 10000 });
         const productName = await merchCard.productName.first().textContent();
-        console.log(`Product name: ${productName}`);
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`📦 Product: ${productName}`);
         let cardPrice = 'N/A';
 
         await merchCard.price.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => null);
         if (await merchCard.price.count() > 0) {
           cardPrice = await merchCard.price.first().textContent();
         }
-        console.log(`Card price: ${cardPrice}`);
+        console.log(`   Card Price: ${cardPrice}`);
 
         const cardResult = {
           tabIndex: i,
@@ -183,18 +184,18 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             const selectedPriceOptions = await modal.selectedPriceOption.all();
             const prices = await Promise.all(selectedPriceOptions.map(async(x) => await x.textContent()));
             cardResult.error = `Two or more prices ${prices.join(', ')} in an option found for tab \"${tabTitle}\" card \"${productName}\"`;
-            console.log(`✗ ${cardResult.error}`);
+            console.log(`\n   ✗ ERROR: ${cardResult.error}`);
           }
           const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
-          console.log(`Selected price option: ${selectedPriceOption}`);
+          console.log(`   Selected Option: ${selectedPriceOption}`);
           if (selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
             cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
-            console.log(`✗ ${cardResult.error}`);
+            console.log(`\n   ✗ ERROR: ${cardResult.error}`);
           }
           
           const priceOptions = await modal.priceOptions.all();
           const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
-          console.log(`Price options: ${priceOptionTexts}`);
+          console.log(`   Available Options: ${priceOptionTexts.join(' | ')}`);
           for (let k = 0; k < priceOptions.length; k++) {
             const priceOption = priceOptions[k];
             const priceOptionText = priceOptionTexts[k];
@@ -227,9 +228,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             if (await cartPage.cartTotalNext.count() > 0) {
               cartTotalNext = await cartPage.cartTotalNext.first().textContent();
             }
-            console.log(`Cart sub total: ${cartSubTotal}`);
-            console.log(`Cart total: ${cartTotal}`);
-            console.log(`Cart total next: ${cartTotalNext}`);
+            console.log(`\n   🛒 Testing Option: ${priceOptionText}`);
+            console.log(`      ├─ Cart Subtotal: ${cartSubTotal}`);
+            console.log(`      ├─ Cart Total: ${cartTotal}`);
+            console.log(`      └─ Next Billing: ${cartTotalNext}`);
             
             await page.screenshot({ path: `screenshots/teams-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
 
@@ -238,7 +240,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) &&
                 (cartTotalNext.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
               optionResult.error = `Cart subtotal/total does not match option price ${priceOptionText} for tab \"${tabTitle}\" card \"${productName}\"`;
-              console.log(`✗ ${optionResult.error}`);
+              console.log(`\n      ✗ ERROR: ${optionResult.error}`);
+            } else {
+              console.log(`      ✓ Price validation passed`);
             }
 
             optionResults.push(optionResult);
