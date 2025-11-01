@@ -128,7 +128,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
         // checkout link could open a new page or a model. need to handle both cases.
         const [newPage] = await Promise.all([
-          page.context().waitForEvent('page', { timeout: 10000 }).catch(() => null),
+          page.context().waitForEvent('page', { timeout: 5000 }).catch(() => null),
           merchCard.checkoutLink.first().click()
         ]);
 
@@ -142,8 +142,6 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           await newPage.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-new-page.png`});
           await newPage.close();
         } else if (newUrl.startsWith(testUrl)) {
-          await page.waitForTimeout(5000);
-          
           await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-modal.png`});
 
           await plansPage.modalIframe.waitFor({ state: 'visible', timeout: 10000 });
@@ -152,7 +150,6 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           if (!modalIframeSrc.startsWith('https://commerce.adobe.com/store/segmentation')) {
             cardResult.error = `Iframe src ${modalIframeSrc} is not valid`;
             console.log(`✗ ${cardResult.error}`);
-            continue;
           }
 
           const modal = new Modal(await plansPage.modalIframe.contentFrame());
