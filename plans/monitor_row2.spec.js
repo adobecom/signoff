@@ -45,6 +45,7 @@ class CartPage {
     this.page = page;
     this.cartSubTotal = page.locator('[data-testid="cart-totals-subtotals-row"] [data-testid="price-full-display"]').filter({visible: true});
     this.cartTotal = page.locator('[class*="CartTotals__cart-totals-total-price"] [data-testid="price-full-display"]').filter({visible: true});
+    this.cartTotalNext = page.locator('[data-testid="cart-totals-upcoming-dueNext-total"] [data-testid="price-full-display"]').filter({visible: true});
   }
 }
 
@@ -222,14 +223,20 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             if (await cartPage.cartTotal.count() > 0) {
               cartTotal = await cartPage.cartTotal.first().textContent();
             }
+            let cartTotalNext = 'N/A';
+            if (await cartPage.cartTotalNext.count() > 0) {
+              cartTotalNext = await cartPage.cartTotalNext.first().textContent();
+            }
             console.log(`Cart sub total: ${cartSubTotal}`);
             console.log(`Cart total: ${cartTotal}`);
+            console.log(`Cart total next: ${cartTotalNext}`);
             
             await page.screenshot({ path: `screenshots/teams-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
 
             const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
             if ((cartSubTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) && 
-                (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
+                (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) &&
+                (cartTotalNext.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
               optionResult.error = `Cart subtotal/total does not match option price ${priceOptionText} for tab \"${tabTitle}\" card \"${productName}\"`;
               console.log(`✗ ${optionResult.error}`);
             }
