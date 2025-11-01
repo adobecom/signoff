@@ -283,7 +283,15 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     // if cardResults or optionResults has any error, print the error and fail the test
     const errorResults = cardResults.concat(optionResults).filter(result => result.error);
     if (errorResults.length > 0) {
-      console.log(`Error results: ${errorResults.map(result => result.error).join('\n')}`);
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`❌ TEST FAILED: ${errorResults.length} ERROR${errorResults.length > 1 ? 'S' : ''} FOUND`);
+      console.log(`${'='.repeat(80)}\n`);
+      errorResults.forEach((result, index) => {
+        console.log(`${index + 1}. ${result.error}\n`);
+      });
+      console.log(`${'='.repeat(80)}`);
+      console.log(`Total Errors: ${errorResults.length}`);
+      console.log(`${'='.repeat(80)}\n`);
       expect(errorResults.length).toBe(0);
     }
   });
