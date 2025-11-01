@@ -43,7 +43,8 @@ class Modal {
 class CartPage {
   constructor(page) {
     this.page = page;
-    this.cartTotal = page.locator('[class*="CartTotals__total-amount-plus-tax"] [data-testid="price-full-display"]').filter({visible: true});
+    this.cartSubTotal = page.locator('[data-testid="cart-totals-subtotals-row"] [data-testid="price-full-display"]').filter({visible: true});
+    this.cartTotal = page.locator('[data-testid="advanced-cart-order-totals-row"] [data-testid="price-full-display"]').filter({visible: true});
   }
 }
 
@@ -116,6 +117,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         const productName = await merchCard.productName.textContent();
         console.log(`Product name: ${productName}`);
         let cardPrice = 'N/A';
+
+        await merchCard.price.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => null);
         if (await merchCard.price.count() > 0) {
           cardPrice = await merchCard.price.first().textContent();
         }
@@ -191,17 +194,19 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           const priceOptions = await modal.priceOptions.all();
           const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
           console.log(`Price options: ${priceOptionTexts}`);
-/*           for (let k = 0; k < priceOptions.length; k++) {
+          for (let k = 0; k < priceOptions.length; k++) {
+            const priceOption = priceOptions[k];
+            const priceOptionText = priceOptionTexts[k];
+
             const optionResult = {
               tabIndex: i,
               tabTitle: tabTitle,
               cardIndex: j,
               cardTitle: productName,
               optionIndex: k,
-              optionTitle: priceOptionTexts[k],
+              optionTitle: priceOptionText,
             };
             
-            const priceOption = priceOptions[k];
             await priceOption.click();
             await page.waitForTimeout(1000);
             await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
@@ -211,12 +216,21 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png`});
 
             const cartPage = new CartPage(page);
-            await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 10000 });
-            const cartTotal = await cartPage.cartTotal.first().textContent();
+            await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
+            const cartSubTotal = await cartPage.cartSubTotal.first().textContent();
+            let cartTotal = 'N/A';
+            if (await cartPage.cartTotal.count() > 0) {
+              cartTotal = await cartPage.cartTotal.first().textContent();
+            }
+            console.log(`Cart sub total: ${cartSubTotal}`);
             console.log(`Cart total: ${cartTotal}`);
+            
+            await page.screenshot({ path: `screenshots/teams-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
 
-            if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionTexts[k].replace(/[^\d.]/g, '')) {
-              optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionTexts[k]} for tab \"${tabTitle}\" card \"${productName}\"`;
+            const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
+            if ((cartSubTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) && 
+                (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
+              optionResult.error = `Cart subtotal/total does not match option price ${priceOptionText} for tab \"${tabTitle}\" card \"${productName}\"`;
               console.log(`✗ ${optionResult.error}`);
             }
 
@@ -231,7 +245,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
               await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
             }
-          } */
+          }
           await plansPage.modalCloseButton.first().click();
         } else {
           console.log(`Redirected to URL ${newUrl}`);
@@ -248,6 +262,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             }
           }
           await page.goBack();
+          await page.waitForTimeout(1000);
         }
         cardResults.push(cardResult);
       }
