@@ -23,7 +23,7 @@ class PlansPage {
 class MerchCard {
   constructor(card) {
     this.card = card;
-    this.productName = card.locator('.title h3');
+    this.productName = card.locator('h3').filter({visible: true}); // JP price is H3
     this.price = card.locator('span[data-wcs-type="price"]').filter({visible: true});
     this.checkoutLink = card.locator('.dexter-Cta .spectrum-Button--cta').filter({visible: true});
   }
@@ -113,8 +113,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
       for (let j = 0; j < merchCards.length; j++) {
         const merchCard = new MerchCard(merchCards[j]);
-        await merchCard.productName.waitFor({ state: 'visible', timeout: 10000 });
-        const productName = await merchCard.productName.textContent();
+        await merchCard.productName.first().waitFor({ state: 'visible', timeout: 10000 });
+        const productName = await merchCard.productName.first().textContent();
         console.log(`Product name: ${productName}`);
         let cardPrice = 'N/A';
 
