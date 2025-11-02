@@ -43,7 +43,9 @@ class CartPage {
 test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/business/teams.html';
-  console.log(`Testing URL: ${testUrl}`);
+  console.log('\n' + '='.repeat(80));
+  console.log('🔍 TESTING URL:', testUrl);
+  console.log('='.repeat(80) + '\n');
 
   test.beforeEach(async ({ page }) => {
     // Block Adobe messaging endpoint to disable Jarvis
@@ -97,7 +99,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     );
     
     if (criticalErrors.length > 0) {
-      console.log('Critical errors found:', criticalErrors);
+      console.log('\n⚠️  CRITICAL ERRORS FOUND:');
+      criticalErrors.forEach((error, idx) => {
+        console.log(`   ${idx + 1}. ${error}`);
+      });
+      console.log('');
     }
     
     expect(criticalErrors.length).toBeLessThanOrEqual(2); // Allow minor non-critical errors
@@ -116,7 +122,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     // Find all tab elements - adjust selector based on actual page structure
     const tabs = await teamsPage.tabs.all();
     
-    console.log(`Found ${tabs.length} tabs to test`);
+    console.log('\n' + '━'.repeat(80));
+    console.log(`📋 FOUND ${tabs.length} TABS TO TEST`);
+    console.log('━'.repeat(80) + '\n');
     
     // Track which tabs were successfully clicked
     const optionResults = [];
@@ -128,7 +136,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       const tabText = await tab.textContent();
 
       try {
-        console.log(`Clicking tab: ${tabText}`);
+        console.log(`\n${'▸'.repeat(40)}`);
+        console.log(`🔹 TAB ${i + 1}/${tabs.length}: "${tabText}"`);
+        console.log(`${'▸'.repeat(40)}`);
         await tab.click();
         await page.waitForTimeout(1000);
   
@@ -147,11 +157,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         try {
           await teamsPage.merchCards.first().waitFor({state: 'visible', timeout: 10000});
         } catch (error) {
-          console.log(`✓ Tab ${i + 1} \"${tabText}\" no merch cards found`);
+          console.log(`   ℹ️  No merch cards found in this tab\n`);
           continue;           
         }
         const merchCards = await teamsPage.merchCards.all();
-        console.log(`Found ${merchCards.length} merch cards in ${tabText} tab`);
+        console.log(`   🛍️  Found ${merchCards.length} merch card(s)\n`);
 
         for (let cardIndex = 0; cardIndex < merchCards.length; cardIndex++) {
           const card = merchCards[cardIndex];
@@ -166,17 +176,20 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           const productName = await merchCard.productName.first().textContent();
 
           if (cardSet.has(productName)) {
-            console.log(`Duplicate card found: ${productName}`);
+            console.log(`      ⚠️  Duplicate card: "${productName}" (skipping)`);
             continue;
           }
           cardSet.add(productName);
+          console.log(`      ╔════════════════════════════════════════`);
+          console.log(`      ║ Card ${cardIndex + 1}/${merchCards.length}: ${productName}`);
+          console.log(`      ╚════════════════════════════════════════`);
 
           const checkoutLinkExists = await merchCard.checkoutLink.count() > 0;
           if (checkoutLinkExists) {
-            console.log(`Clicking checkout link for ${productName}`);
+            console.log(`         → Clicking checkout link...`);
             await merchCard.checkoutLink.first().click();
           } else {
-            console.log(`No checkout link found for ${productName}`);
+            console.log(`         ⚠️  No checkout link found\n`);
             continue;
           }
           await page.waitForTimeout(5000);
@@ -186,10 +199,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           try {
             await modal.selectedTab.first().waitFor({state: 'visible', timeout: 10000});
             const tabTestId = await modal.selectedTab.first().getAttribute('data-testid')
-            console.log(`Selected tab test id: ${tabTestId}`);
+            console.log(`         → Modal tab: ${tabTestId}`);
             const isBusinessTab = tabTestId === 'segmentation-tab-item-TEAM_COM';
           } catch (error) {
-            console.log(`No selected tab found for ${productName}`);        
+            console.log(`         ⚠️  No selected tab found in modal`);        
           }
 
           try {
@@ -202,7 +215,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               cardText: productName,
               error: `No price options found for ${productName}`,
             });
-            console.log(`No price options found for ${productName}`);
+            console.log(`         ❌ No price options found\n`);
           }
 
           await page.screenshot({ 
@@ -213,16 +226,16 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             const continueBtn = modal.continueButton.first();
             await continueBtn.waitFor({state: 'visible', timeout: 10000});
             await expect(continueBtn).toBeEnabled({timeout: 10000});
-            console.log(`Continue button is enabled for ${productName}`);          
+            console.log(`         ✓ Continue button ready`);          
           } catch (error) {
-            console.log(`Continue button not ready for ${productName}`);
+            console.log(`         ❌ Continue button not ready\n`);
             await modal.modalCloseButton.first().click();
             await page.waitForTimeout(1000);
             continue;
           }
           const priceOptions = await modal.priceOptions.all();
           const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
-          console.log(`Price options: ${priceOptionTexts}`);
+          console.log(`         💰 Price options (${priceOptions.length}): ${priceOptionTexts.join(', ')}`);
 
           for (const [index, priceOptionText] of priceOptionTexts.entries()) {
             optionResults.push({
@@ -237,12 +250,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           await expect(modal.modalCloseButton.first()).toBeEnabled({timeout: 10000});
           await modal.modalCloseButton.first().click();
           await page.waitForTimeout(1000);
+          console.log(`         ✓ Card verified\n`);
         }
 
-        console.log(`✓ Tab ${i + 1} \"${tabText}\" verified successfully`);
+        console.log(`   ✅ Tab "${tabText}" completed successfully\n`);
         
       } catch (error) {
-        console.log(`✗ Tab ${i + 1} failed: ${error.message}`);
+        console.log(`   ❌ Tab "${tabText}" failed: ${error.message}\n`);
       }
     }
         
@@ -250,11 +264,17 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     expect(tabs.length).toBeGreaterThan(0);
 
     if (cardErrors.length > 0) {
-      console.log(`Card errors: ${cardErrors.map(error => error.error).join('\n')}`);
+      console.log('\n❌ CARD ERRORS DETECTED:');
+      cardErrors.forEach((error, idx) => {
+        console.log(`   ${idx + 1}. ${error.error}`);
+      });
+      console.log('');
       expect(cardErrors.length).toBe(0);
     }
 
-    console.log(`Check out price options: ${optionResults.length}`);
+    console.log('\n' + '═'.repeat(80));
+    console.log(`🛒 CHECKOUT FLOW TEST: ${optionResults.length} PRICE OPTION(S) TO VERIFY`);
+    console.log('═'.repeat(80) + '\n');
 
     for (const optionResult of optionResults) {
       const tabIndex = optionResult.tabIndex;
@@ -265,12 +285,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       const priceOptionText = optionResult.priceOptionText;
       
       try {
-        console.log(`Tab index: ${tabIndex}`);
-        console.log(`Tab text: ${tabText}`);
-        console.log(`Card index: ${cardIndex}`);
-        console.log(`Card text: ${cardText}`);
-        console.log(`Option index: ${optionIndex}`);
-        console.log(`Price option text: ${priceOptionText}`);
+        console.log(`\n┌${'─'.repeat(78)}┐`);
+        console.log(`│ Test ${optionResults.indexOf(optionResult) + 1}/${optionResults.length}`.padEnd(79) + '│');
+        console.log(`├${'─'.repeat(78)}┤`);
+        console.log(`│ Tab: "${tabText}" (index: ${tabIndex})`.padEnd(79) + '│');
+        console.log(`│ Card: "${cardText}" (index: ${cardIndex})`.padEnd(79) + '│');
+        console.log(`│ Price Option ${optionIndex + 1}: ${priceOptionText}`.padEnd(79) + '│');
+        console.log(`└${'─'.repeat(78)}┘`);
 
         await page.goto(testUrl);
         const teamsPage = new TeamsPage(page);
@@ -304,26 +325,38 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         const cartPage = new CartPage(page);
         await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 20000 });
         const cartTotal = await cartPage.cartTotal.first().textContent();
-        console.log(`Cart total: ${cartTotal}`);
+        console.log(`   → Cart Total: ${cartTotal}`);
 
         await page.screenshot({ path: `screenshots/teams-tab-${tabIndex + 1}-card-${cardIndex + 1}-cart.png` }  );
 
         if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionText.replace(/[^\d.]/g, '')) {
           optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionText} for tab \"${tabText}\" card \"${cardText}\"`;
-          console.log(`✗ ${optionResult.error}`);
+          console.log(`   ❌ PRICE MISMATCH: Expected ${priceOptionText}, got ${cartTotal}\n`);
+        } else {
+          console.log(`   ✅ VERIFIED: Price matches cart total\n`);
         }
       } catch (error) {
-        console.log(`Error processing option result: ${error.message}`);
+        console.log(`   ❌ ERROR: ${error.message}`);
         await page.screenshot({ path: `screenshots/teams-tab-${tabIndex + 1}-card-${cardIndex + 1}-error.png` });
         optionResult.error = `Error processing option result: ${error.message}`;
-        console.log(`✗ ${optionResult.error}`);
+        console.log('');
       }
     }
 
     const errorResults = optionResults.filter(result => result.error);
     if (errorResults.length > 0) {
-      console.log(`Option results: ${errorResults.map(result => result.error).join('\n')}`);
+      console.log('\n' + '═'.repeat(80));
+      console.log(`❌ TEST FAILURES: ${errorResults.length} ERROR(S) FOUND`);
+      console.log('═'.repeat(80));
+      errorResults.forEach((result, idx) => {
+        console.log(`\n${idx + 1}. ${result.error}`);
+      });
+      console.log('\n' + '═'.repeat(80) + '\n');
       await expect(errorResults.length).toBe(0);
+    } else {
+      console.log('\n' + '═'.repeat(80));
+      console.log('✅ ALL TESTS PASSED SUCCESSFULLY');
+      console.log('═'.repeat(80) + '\n');
     }
   });
 });
