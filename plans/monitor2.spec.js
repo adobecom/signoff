@@ -53,13 +53,17 @@ class CartPage {
 test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/plans.html';
-  console.log(`Testing URL: ${testUrl}`);
+  console.log('\n' + '='.repeat(80));
+  console.log('🎯 TEST CONFIGURATION');
+  console.log('='.repeat(80));
+  console.log(`URL: ${testUrl}`);
+  console.log('='.repeat(80) + '\n');
 
   test.beforeEach(async ({ page }) => {
     try {
       await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
     } catch (err) {
-      console.log('Timeout on Waiting for network idle!');
+      console.log('⚠️  Warning: Timeout while waiting for network idle');
     }
   });
 
@@ -75,7 +79,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
     const tabs = await plansPage.tabs.all();
 
-    console.log(`Found ${tabs.length} tabs to test`);
+    console.log('\n' + '─'.repeat(80));
+    console.log(`📑 TABS DISCOVERY: Found ${tabs.length} tabs to test`);
+    console.log('─'.repeat(80));
 
     for (let i = 0; i < tabs.length; i++) {
       const tab = tabs[i];
@@ -87,11 +93,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         cardCount: 0,
       };
 
+      console.log(`\n  ┌─ Tab ${i + 1}/${tabs.length}: "${tabTitle}"`);
+      
       await tab.click();
       await page.waitForTimeout(1000);
       const tabPanel = await plansPage.getTabPanel(tab);
       const merchCards = await plansPage.getMerchCards(tabPanel);
-      console.log(`Found ${merchCards.length} merch cards to test`);  
+      console.log(`  │  Found ${merchCards.length} merch card${merchCards.length !== 1 ? 's' : ''} to test`);  
 
       tabResult.cardCount = merchCards.length;
 
@@ -101,12 +109,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         const merchCard = new MerchCard(merchCards[j]);
         await merchCard.productName.waitFor({ state: 'visible', timeout: 10000 });
         const productName = await merchCard.productName.textContent();
-        console.log(`Product name: ${productName}`);
         let cardPrice = 'N/A';
         if (await merchCard.price.count() > 0) {
           cardPrice = await merchCard.price.first().textContent();
         }
-        console.log(`Card price: ${cardPrice}`);
+        console.log(`  │`);
+        console.log(`  │  ├─ Card ${j + 1}/${merchCards.length}: "${productName}"`);
+        console.log(`  │  │  Price: ${cardPrice}`);
 
         const cardResult = {
           tabIndex: i,
@@ -119,7 +128,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         await merchCard.card.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}.png`});
 
         if (await merchCard.checkoutLink.count() === 0) {
-          console.log(`No checkout link found for ${productName}`);
+          console.log(`  │  │  ⚠️  No checkout link found`);
           cardResults.push(cardResult);
           continue;
         }
@@ -135,21 +144,22 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         const newUrl = await page.url();
         
         if (newPage) {
-          console.log(`New page opened for ${productName}`);
           const newPageUrl = newPage.url();
-          console.log(`New page URL: ${newPageUrl}`);
+          console.log(`  │  │  🔗 New page opened`);
+          console.log(`  │  │     URL: ${newPageUrl}`);
           await newPage.waitForTimeout(5000);
           await newPage.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-new-page.png`});
           await newPage.close();
         } else if (newUrl.startsWith(testUrl)) {
+          console.log(`  │  │  🎭 Modal opened`);
           await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-modal.png`});
 
           await plansPage.modalIframe.waitFor({ state: 'visible', timeout: 10000 });
           const modalIframeSrc = await plansPage.modalIframe.getAttribute('src');
-          console.log(`Modal iframe src: ${modalIframeSrc}`);
+          console.log(`  │  │     Iframe: ${modalIframeSrc}`);
           if (!modalIframeSrc.startsWith('https://commerce.adobe.com/store/segmentation')) {
             cardResult.error = `Iframe src ${modalIframeSrc} is not valid`;
-            console.log(`✗ ${cardResult.error}`);
+            console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
           }
 
           const modal = new Modal(await plansPage.modalIframe.contentFrame());
@@ -158,15 +168,17 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           await modal.selectedPriceOption.waitFor({ state: 'visible', timeout: 10000 });
           const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
-          console.log(`Selected price option: ${selectedPriceOption}`);
+          console.log(`  │  │     Selected: ${selectedPriceOption}`);
           if (selectedPriceOption.replace(/[^\d.]/g, '') !== cardPrice.replace(/[^\d.]/g, '')) {
             cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
-            console.log(`✗ ${optionResult.error}`);
+            console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
+          } else {
+            console.log(`  │  │     ✓ Price matches card price`);
           }
           
           const priceOptions = await modal.priceOptions.all();
           const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
-          console.log(`Price options: ${priceOptionTexts}`);
+          console.log(`  │  │     Testing ${priceOptions.length} price option${priceOptions.length !== 1 ? 's' : ''}: [${priceOptionTexts.join(', ')}]`);
           for (let k = 0; k < priceOptions.length; k++) {
             const optionResult = {
               tabIndex: i,
@@ -189,11 +201,14 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             const cartPage = new CartPage(page);
             await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 10000 });
             const cartTotal = await cartPage.cartTotal.first().textContent();
-            console.log(`Cart total: ${cartTotal}`);
+            console.log(`  │  │       → Option ${k + 1}/${priceOptions.length}: ${priceOptionTexts[k]}`);
+            console.log(`  │  │          Cart total: ${cartTotal}`);
 
             if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionTexts[k].replace(/[^\d.]/g, '')) {
               optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionTexts[k]} for tab \"${tabTitle}\" card \"${productName}\"`;
-              console.log(`✗ ${optionResult.error}`);
+              console.log(`  │  │          ✗ ERROR: Price mismatch`);
+            } else {
+              console.log(`  │  │          ✓ Price matches`);
             }
 
             optionResults.push(optionResult);
@@ -210,17 +225,17 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           }
           await plansPage.modalCloseButton.first().click();
         } else {
-          console.log(`Redirected to URL ${newUrl}`);
+          console.log(`  │  │  🔀 Redirected to: ${newUrl}`);
           await page.waitForTimeout(5000);
           await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-redirected.png`});
 
           if (cardPrice !== 'N/A') {
             const redirectedPageContent = await page.textContent('body');
             if (redirectedPageContent.includes(cardPrice)) {
-              console.log(`Card price found in redirected page content`);
+              console.log(`  │  │     ✓ Card price found in redirected page`);
             } else {
               cardResult.error = `Card price ${cardPrice} not found in redirected page content for tab \"${tabTitle}\" card \"${productName}\"`;
-              console.log(`✗ ${cardResult.error}`);
+              console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
             }
           }
           await page.goBack();
@@ -233,9 +248,28 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
     // if cardResults or optionResults has any error, print the error and fail the test
     const errorResults = cardResults.concat(optionResults).filter(result => result.error);
+    
+    console.log('\n' + '─'.repeat(80));
+    console.log(`  └─ Completed testing all tabs`);
+    console.log('\n' + '='.repeat(80));
+    console.log('📊 TEST SUMMARY');
+    console.log('='.repeat(80));
+    console.log(`Tabs tested: ${tabResults.length}`);
+    console.log(`Cards tested: ${cardResults.length}`);
+    console.log(`Price options tested: ${optionResults.length}`);
+    console.log(`Errors found: ${errorResults.length}`);
+    
     if (errorResults.length > 0) {
-      console.log(`Error results: ${errorResults.map(result => result.error).join('\n')}`);
+      console.log('\n' + '⚠️  ERRORS DETECTED'.padEnd(80, ' '));
+      console.log('─'.repeat(80));
+      errorResults.forEach((result, index) => {
+        console.log(`\n${index + 1}. ${result.error}`);
+      });
+      console.log('\n' + '='.repeat(80) + '\n');
       expect(errorResults.length).toBe(0);
+    } else {
+      console.log('\n✅ All tests passed successfully!');
+      console.log('='.repeat(80) + '\n');
     }
   });
 });  
