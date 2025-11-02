@@ -1,0 +1,149 @@
+# Adobe Creative Cloud Plans - Supported Locales
+
+## Overview
+This document defines all supported locales for Adobe Creative Cloud pages (e.g., /creativecloud/plans.html).
+Use these locale codes when writing tests, configuring monitoring, or developing locale-specific features.
+
+## Locale Format
+Locales follow the pattern: `/{locale}/` or `/{country}_{language}/`
+- Base URL structure: `https://www.adobe.com/{locale}/creativecloud/plans.html`
+- US locale has no prefix: `https://www.adobe.com/creativecloud/plans.html`
+
+## Supported Locales by Region
+
+### Americas (LATAM)
+- `ar` - Argentina
+- `br` - Brazil
+- `ca` - Canada (English)
+- `ca_fr` - Canada (French)
+- `cl` - Chile
+- `co` - Colombia
+- `cr` - Costa Rica
+- `ec` - Ecuador
+- `gt` - Guatemala
+- `la` - Latin America
+- `mx` - Mexico
+- `pe` - Peru
+- `pr` - Puerto Rico
+- `` - United States (no prefix)
+
+### Europe, Middle East & Africa (EMEA)
+- `africa` - Africa
+- `at` - Austria
+- `be_en` - Belgium (English)
+- `be_fr` - Belgium (French)
+- `be_nl` - Belgium (Dutch)
+- `bg` - Bulgaria
+- `ch_de` - Switzerland (German)
+- `ch_fr` - Switzerland (French)
+- `ch_it` - Switzerland (Italian)
+- `cz` - Czech Republic
+- `de` - Germany
+- `dk` - Denmark
+- `ee` - Estonia
+- `eg_ar` - Egypt (Arabic)
+- `eg_en` - Egypt (English)
+- `es` - Spain
+- `fi` - Finland
+- `fr` - France
+- `gr_el` - Greece (Greek)
+- `gr_en` - Greece (English)
+- `hu` - Hungary
+- `ie` - Ireland
+- `il_en` - Israel (English)
+- `il_he` - Israel (Hebrew)
+- `it` - Italy
+- `kw_ar` - Kuwait (Arabic)
+- `kw_en` - Kuwait (English)
+- `lt` - Lithuania
+- `lu_de` - Luxembourg (German)
+- `lu_en` - Luxembourg (English)
+- `lu_fr` - Luxembourg (French)
+- `lv` - Latvia
+- `mena_ar` - MENA (Arabic)
+- `mena_en` - MENA (English)
+- `ng` - Nigeria
+- `nl` - Netherlands
+- `no` - Norway
+- `pl` - Poland
+- `pt` - Portugal
+- `qa_ar` - Qatar (Arabic)
+- `qa_en` - Qatar (English)
+- `ro` - Romania
+- `ru` - Russia
+- `sa_ar` - Saudi Arabia (Arabic)
+- `sa_en` - Saudi Arabia (English)
+- `se` - Sweden
+- `si` - Slovenia
+- `sk` - Slovakia
+- `tr` - Turkey
+- `ua` - Ukraine
+- `uk` - United Kingdom
+- `za` - South Africa
+- `ae_ar` - UAE (Arabic)
+- `ae_en` - UAE (English)
+
+### Asia Pacific (APAC)
+- `au` - Australia
+- `cn` - China
+- `hk_en` - Hong Kong (English)
+- `hk_zh` - Hong Kong (Chinese)
+- `id_en` - Indonesia (English)
+- `id_id` - Indonesia (Indonesian)
+- `in` - India (English)
+- `in_hi` - India (Hindi)
+- `jp` - Japan
+- `kr` - Korea
+- `my_en` - Malaysia (English)
+- `my_ms` - Malaysia (Malay)
+- `nz` - New Zealand
+- `ph_en` - Philippines (English)
+- `ph_fil` - Philippines (Filipino)
+- `sg` - Singapore
+- `th_en` - Thailand (English)
+- `th_th` - Thailand (Thai)
+- `tw` - Taiwan
+- `vn_en` - Vietnam (English)
+- `vn_vi` - Vietnam (Vietnamese)
+
+## Usage in Code
+
+### JavaScript/TypeScript Array
+```javascript
+const SUPPORTED_LOCALES = [
+  '', 'ar', 'br', 'ca', 'ca_fr', 'cl', 'co', 'cr', 'ec', 'gt', 'la', 'mx', 'pe', 'pr',
+  'africa', 'at', 'be_en', 'be_fr', 'be_nl', 'bg', 'ch_de', 'ch_fr', 'ch_it', 'cz', 'de', 
+  'dk', 'ee', 'eg_ar', 'eg_en', 'es', 'fi', 'fr', 'gr_el', 'gr_en', 'hu', 'ie', 'il_en', 
+  'il_he', 'it', 'kw_ar', 'kw_en', 'lt', 'lu_de', 'lu_en', 'lu_fr', 'lv', 'mena_ar', 
+  'mena_en', 'ng', 'nl', 'no', 'pl', 'pt', 'qa_ar', 'qa_en', 'ro', 'ru', 'sa_ar', 'sa_en', 
+  'se', 'si', 'sk', 'tr', 'ua', 'uk', 'za', 'ae_ar', 'ae_en', 'au', 'cn', 'hk_en', 'hk_zh', 
+  'id_en', 'id_id', 'in', 'in_hi', 'jp', 'kr', 'my_en', 'my_ms', 'nz', 'ph_en', 'ph_fil', 
+  'sg', 'th_en', 'th_th', 'tw', 'vn_en', 'vn_vi'
+];
+```
+
+### Building URLs
+```javascript
+function buildPlansUrl(locale, page = 'plans') {
+  const baseUrl = 'https://www.adobe.com';
+  const localePrefix = locale ? `/${locale}` : '';
+  return `${baseUrl}${localePrefix}/creativecloud/${page}.html`;
+}
+
+// Example: buildPlansUrl('fr') => 'https://www.adobe.com/fr/creativecloud/plans.html'
+// Example: buildPlansUrl('') => 'https://www.adobe.com/creativecloud/plans.html'
+```
+
+### Test Configuration
+When writing tests or monitors for multiple locales:
+- Group by region for parallel execution
+- Consider timezone differences for scheduling
+- Account for different pricing/currency displays
+- Test both left-to-right (LTR) and right-to-left (RTL) languages (Arabic locales)
+
+## Notes
+- Total: 92 supported locales
+- RTL languages: Arabic variants (eg_ar, kw_ar, qa_ar, sa_ar, ae_ar, mena_ar) and Hebrew (il_he)
+- Multi-language countries: Belgium (3), Luxembourg (3), Switzerland (3), Egypt (2), Greece (2), etc.
+- Empty string ('') represents US locale (no prefix in URL)
+

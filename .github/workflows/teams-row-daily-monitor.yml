@@ -25,23 +25,113 @@ on:
         required: false
         type: string
       locale:
-        description: 'Locale to test (leave empty to test all)'
+        description: 'Locale to test'
         required: false
         type: choice
         options:
-          - ''
-          - 'UK'
-          - 'Japan'
-          - 'Germany'
-          - 'France'
-          - 'Spain'
-          - 'Italy'
-          - 'India'
-          - 'Brazil'
+          - 'all'
+          - 'ae_ar'
+          - 'ae_en'
+          - 'africa'
+          - 'ar'
+          - 'at'
+          - 'au'
+          - 'be_en'
+          - 'be_fr'
+          - 'be_nl'
+          - 'bg'
+          - 'br'
+          - 'ca'
+          - 'ca_fr'
+          - 'ch_de'
+          - 'ch_fr'
+          - 'ch_it'
+          - 'cl'
+          - 'cn'
+          - 'co'
+          - 'cr'
+          - 'cz'
+          - 'de'
+          - 'dk'
+          - 'ec'
+          - 'ee'
+          - 'eg_ar'
+          - 'eg_en'
+          - 'es'
+          - 'fi'
+          - 'fr'
+          - 'gr_el'
+          - 'gr_en'
+          - 'gt'
+          - 'hk_en'
+          - 'hk_zh'
+          - 'hu'
+          - 'id_en'
+          - 'id_id'
+          - 'ie'
+          - 'il_en'
+          - 'il_he'
+          - 'in'
+          - 'in_hi'
+          - 'it'
+          - 'jp'
+          - 'kr'
+          - 'kw_ar'
+          - 'kw_en'
+          - 'la'
+          - 'lt'
+          - 'lu_de'
+          - 'lu_en'
+          - 'lu_fr'
+          - 'lv'
+          - 'mena_ar'
+          - 'mena_en'
+          - 'mx'
+          - 'my_en'
+          - 'my_ms'
+          - 'ng'
+          - 'nl'
+          - 'no'
+          - 'nz'
+          - 'pe'
+          - 'ph_en'
+          - 'ph_fil'
+          - 'pl'
+          - 'pr'
+          - 'pt'
+          - 'qa_ar'
+          - 'qa_en'
+          - 'ro'
+          - 'ru'
+          - 'sa_ar'
+          - 'sa_en'
+          - 'se'
+          - 'sg'
+          - 'si'
+          - 'sk'
+          - 'th_en'
+          - 'th_th'
+          - 'tr'
+          - 'tw'
+          - 'ua'
+          - 'uk'
+          - 'vn_en'
+          - 'vn_vi'
+          - 'za'
       test_tabs:
         description: 'Test Tabs'
         required: false
         type: string
+      slack_channel_passed:
+        description: 'Slack channel for passed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
+      slack_channel_failed:
+        description: 'Slack channel for failed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
 
 jobs:
   filter-matrix:
@@ -65,21 +155,13 @@ jobs:
               "08"|"20") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/business/teams.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
               "09"|"21") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/business/teams.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
             esac
-          elif [ "${{ inputs.locale }}" == "" ]; then
+          elif [ "${{ inputs.locale }}" == "all" ]; then
             # Manual trigger with no locale: run all
             echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/business/teams.html","locale":"UK"},{"url":"https://www.adobe.com/jp/creativecloud/business/teams.html","locale":"Japan"},{"url":"https://www.adobe.com/de/creativecloud/business/teams.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/business/teams.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/business/teams.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/business/teams.html","locale":"Italy"},{"url":"https://www.adobe.com/in/creativecloud/business/teams.html","locale":"India"},{"url":"https://www.adobe.com/br/creativecloud/business/teams.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT
           else
             # Manual trigger with specific locale
-            case "${{ inputs.locale }}" in
-              "UK") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/business/teams.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
-              "Japan") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/business/teams.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
-              "Germany") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/business/teams.html","locale":"Germany"}]}' >> $GITHUB_OUTPUT ;;
-              "France") echo 'matrix={"include":[{"url":"https://www.adobe.com/fr/creativecloud/business/teams.html","locale":"France"}]}' >> $GITHUB_OUTPUT ;;
-              "Spain") echo 'matrix={"include":[{"url":"https://www.adobe.com/es/creativecloud/business/teams.html","locale":"Spain"}]}' >> $GITHUB_OUTPUT ;;
-              "Italy") echo 'matrix={"include":[{"url":"https://www.adobe.com/it/creativecloud/business/teams.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "India") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/business/teams.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "Brazil") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/business/teams.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-            esac
+            LOCALE="${{ inputs.locale }}"
+            echo "matrix={\"include\":[{\"url\":\"https://www.adobe.com/${LOCALE}/creativecloud/business/teams.html\",\"locale\":\"${LOCALE}\"}]}" >> $GITHUB_OUTPUT
           fi
 
   monitor:
@@ -128,7 +210,7 @@ jobs:
         if: success()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_CHANNEL: ${{ inputs.slack_channel_passed || 'loot-loaders-tests' }}
           SLACK_COLOR: good
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Teams ROW Monitor
@@ -145,7 +227,7 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_CHANNEL: ${{ inputs.slack_channel_failed || 'loot-loaders-tests' }}
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Teams ROW Monitor
