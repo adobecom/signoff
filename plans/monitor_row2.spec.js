@@ -120,8 +120,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         console.log(`📦 Product: ${productName}`);
         let cardPrice = 'N/A';
 
-        await merchCard.price.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => null);
+        await merchCard.price.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => null);
         if (await merchCard.price.count() > 0) {
+          await expect(merchCard.price.first()).not.toBeEmpty({ timeout: 5000 });
           cardPrice = await merchCard.price.first().textContent();
         }
         console.log(`   Card Price: ${cardPrice}`);
