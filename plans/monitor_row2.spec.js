@@ -24,7 +24,7 @@ class MerchCard {
   constructor(card) {
     this.card = card;
     this.productName = card.locator('h3').filter({visible: true}); // JP price is H3
-    this.price = card.locator('span[data-wcs-type="price"]').filter({visible: true});
+    this.price = card.locator(':not([class*="strikethrough"])>span[data-wcs-type="price"]').filter({visible: true});
     this.checkoutLink = card.locator('.dexter-Cta .spectrum-Button--cta').filter({visible: true});
   }
 }
@@ -34,8 +34,8 @@ class Modal {
     this.modal = modal;
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
-    this.priceOptions = modal.locator('.subscription-panel-offer-price [data-wcs-type="price"]').filter({visible: true});
-    this.selectedPriceOption = modal.locator('input[checked] + label [data-wcs-type="price"]').filter({visible: true});
+    this.priceOptions = modal.locator('.subscription-panel-offer-price :not([class*="strikethrough"])>[data-wcs-type="price"]').filter({visible: true});
+    this.selectedPriceOption = modal.locator('input[checked] + label :not([class*="strikethrough"])>[data-wcs-type="price"]').filter({visible: true});
     this.continueButton = modal.locator('.spectrum-Button--cta').filter({visible: true});
   }
 }
@@ -111,6 +111,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       tabResult.cardCount = merchCards.length;
 
       await page.screenshot({ path: `screenshots/plans-tab-${i + 1}.png`});
+
+      expect(merchCards.length, `Tab "${tabTitle}" should have at least 1 card`).toBeGreaterThanOrEqual(1);
 
       for (let j = 0; j < merchCards.length; j++) {
         const merchCard = new MerchCard(merchCards[j]);
