@@ -96,6 +96,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       const tab = tabs[i];
       const tabTitle = await tab.textContent();
 
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`🔍 Testing Tab ${i + 1}/${tabs.length}: "${tabTitle}"`);
+      console.log(`${'='.repeat(80)}`);
+
       const tabResult = {
         tabIndex: i,
         tabTitle: tabTitle,
@@ -106,7 +110,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       await page.waitForTimeout(1000);
       const tabPanel = await plansPage.getTabPanel(tab);
       const merchCards = await plansPage.getMerchCards(tabPanel);
-      console.log(`Found ${merchCards.length} merch cards to test`);  
+      console.log(`📋 Found ${merchCards.length} merch card${merchCards.length !== 1 ? 's' : ''} in this tab`);  
 
       tabResult.cardCount = merchCards.length;
 
@@ -280,6 +284,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         }
         cardResults.push(cardResult);
       }
+      
+      console.log(`\n✅ Completed Tab ${i + 1}/${tabs.length}: "${tabTitle}" (${merchCards.length} cards tested)`);
+      console.log(`${'='.repeat(80)}\n`);
+      
       tabResults.push(tabResult);
     }
 
