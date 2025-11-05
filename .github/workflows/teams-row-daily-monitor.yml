@@ -227,7 +227,7 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: ${{ inputs.slack_channel_failed || 'loot-loaders-alerts' }}
+          SLACK_CHANNEL: ${{ github.event_name == 'schedule' && 'loot-loaders-alerts' || inputs.slack_channel_failed || 'loot-loaders-alerts' }}
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Teams ROW Monitor
