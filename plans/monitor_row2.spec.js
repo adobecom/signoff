@@ -77,6 +77,8 @@ function saveErrorReport(testName, errors, testUrl) {
 }
 
 test.describe('Creative Cloud Plans Page Monitoring', () => {
+  // Disable retries for this test suite since we're already collecting comprehensive error reports
+  test.describe.configure({ retries: 0 });
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/uk/creativecloud/plans.html';
   console.log(`Testing URL: ${testUrl}`);
@@ -387,7 +389,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       const errorMessages = errorResults.map(r => r.error);
       saveErrorReport('Price Errors', errorMessages, testUrl);
       
-      expect(errorResults.length, { timeout: 1 }).toBe(0);
+      expect(errorResults.length).toBe(0);
     }
   });
 });  
