@@ -5,6 +5,7 @@ const path = require('path');
 class PlansPage {
   constructor(page) {
     this.page = page;
+    this.pageLoadOk = page.locator('div.evidon-notice-link');
     this.tabs = page.locator('[data-name="segments"] [role="tab"]').filter({visible: true}); 
     this.tabContent = page.locator('.tab-content');
     this.tabPanel = this.tabContent.locator('.tabpanel').filter({visible: true});
