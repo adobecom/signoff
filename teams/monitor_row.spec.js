@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
 
 class TeamsPage {
   constructor(page) {
@@ -39,6 +41,31 @@ class CartPage {
     this.cartSubTotal = page.locator('[data-testid="cart-totals-subtotals-row"] [data-testid="price-full-display"]').filter({visible: true});
     this.cartTotal = page.locator('[data-testid="advanced-cart-order-totals-row"] [data-testid="price-full-display"]').filter({visible: true});
   }
+}
+
+// Helper function to save error information for notifications
+function saveErrorReport(testName, errors, testUrl) {
+  const errorReport = {
+    timestamp: new Date().toISOString(),
+    testName: testName,
+    testUrl: testUrl,
+    errorCount: errors.length,
+    errors: errors,
+    status: 'FAILED'
+  };
+
+  const reportDir = path.join(__dirname, '..', 'test-results');
+  if (!fs.existsSync(reportDir)) {
+    fs.mkdirSync(reportDir, { recursive: true });
+  }
+
+  // Create unique filename based on test name
+  const sanitizedTestName = testName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const reportPath = path.join(reportDir, `error-report-${sanitizedTestName}.json`);
+  fs.writeFileSync(reportPath, JSON.stringify(errorReport, null, 2));
+  
+  console.log(`\n📝 Error report saved to: ${reportPath}`);
+  return reportPath;
 }
 
 test.describe('Creative Cloud Plans Page Monitoring', () => {
@@ -132,6 +159,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         console.log(`   ${idx + 1}. ${error}`);
       });
       console.log('');
+      
+      // Save error report for notifications if we exceed threshold
+      if (criticalErrors.length > 2) {
+        saveErrorReport('Console Errors', criticalErrors, testUrl);
+      }
     }
     
     expect(criticalErrors.length).toBeLessThanOrEqual(2); // Allow minor non-critical errors
@@ -297,6 +329,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         console.log(`   ${idx + 1}. ${error.error}`);
       });
       console.log('');
+      
+      // Save error report for notifications
+      const errorMessages = cardErrors.map(e => e.error);
+      saveErrorReport('should click and verify all merch cards - card errors', errorMessages, testUrl);
+      
       expect(cardErrors.length).toBe(0);
     }
 
@@ -387,6 +424,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         console.log(`\n${idx + 1}. ${result.error}`);
       });
       console.log('\n' + '═'.repeat(80) + '\n');
+      
+      // Save error report for notifications
+      const errorMessages = errorResults.map(r => r.error);
+      saveErrorReport('Checkout Errors', errorMessages, testUrl);
+      
       await expect(errorResults.length).toBe(0);
     } else {
       console.log('\n' + '═'.repeat(80));
