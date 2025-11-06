@@ -200,6 +200,11 @@ jobs:
         if: failure()
         id: process-errors
         run: |
+          # Install jq if not available
+          if ! command -v jq &> /dev/null; then
+            apt-get update && apt-get install -y jq
+          fi
+          
           ERROR_SUMMARY=""
           if [ -d "test-results" ] && [ -n "$(ls -A test-results/error-report-*.json 2>/dev/null)" ]; then
             echo "Found error report files"
