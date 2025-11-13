@@ -92,7 +92,7 @@ class MerchCard {
   constructor(card) {
     this.card = card;
     this.productName = card.locator('h3');
-    this.price = card.locator('span[is="inline-price"][data-template="price"]').filter({visible: true});
+    this.price = card.locator('span[is="inline-price"][data-template="price"] .price:not(.price-strikethrough)').filter({visible: true});
     this.checkoutLink = card.locator('a[is="checkout-link"]');
   }
 }
