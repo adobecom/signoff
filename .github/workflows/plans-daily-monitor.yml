@@ -2,8 +2,19 @@ name: Plans Daily Monitor
 
 on:
   schedule:
-    - cron: '0 1 * * *'
-    - cron: '0 13 * * *'
+    # Daytime schedule (8am EST to 4pm PST)
+    - cron: '0 13 * * *'   # 1:00 PM UTC (8:00 AM EST)
+    - cron: '50 14 * * *'  # 2:50 PM UTC (9:50 AM EST)
+    - cron: '40 16 * * *'  # 4:40 PM UTC (11:40 AM EST)
+    - cron: '30 18 * * *'  # 6:30 PM UTC (1:30 PM EST)
+    - cron: '20 20 * * *'  # 8:20 PM UTC (3:20 PM EST)
+    - cron: '10 22 * * *'  # 10:10 PM UTC (5:10 PM EST)
+    - cron: '0 0 * * *'    # 12:00 AM UTC (7:00 PM EST / 4:00 PM PST)
+
+    # Nighttime schedule (8pm PST to 6am EST)
+    - cron: '0 4 * * *'    # 4:00 AM UTC (8:00 PM PST)
+    - cron: '30 7 * * *'   # 7:30 AM UTC (11:30 PM PST)
+    - cron: '0 11 * * *'   # 11:00 AM UTC (6:00 AM EST)
   workflow_dispatch:
     inputs:
       test_url:
