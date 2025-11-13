@@ -10,6 +10,16 @@ on:
         description: 'Test URL'
         required: false
         type: string
+      slack_channel_passed:
+        description: 'Slack channel for passed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
+      slack_channel_failed:
+        description: 'Slack channel for failed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
 
 jobs:
   monitor:
@@ -57,7 +67,7 @@ jobs:
         if: success()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: loot-loaders-tests
+          SLACK_CHANNEL: ${{ inputs.slack_channel_passed || 'loot-loaders-tests' }}
           SLACK_COLOR: good
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Plans US Monitor 2
@@ -74,7 +84,7 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: loot-loaders-alerts
+          SLACK_CHANNEL: ${{ github.event_name == 'schedule' && 'loot-loaders-alerts' || inputs.slack_channel_failed || 'loot-loaders-alerts' }}
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Plans US Monitor 2
