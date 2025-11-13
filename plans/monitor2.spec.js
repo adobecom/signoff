@@ -1,4 +1,70 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
+
+// State management for tracking passed cards across retries
+class TestStateManager {
+  constructor(testName) {
+    this.stateDir = path.join(__dirname, '..', 'test-results', '.test-state');
+    if (!fs.existsSync(this.stateDir)) {
+      fs.mkdirSync(this.stateDir, { recursive: true });
+    }
+    
+    // Create unique state file per test URL
+    const sanitizedName = testName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    this.stateFile = path.join(this.stateDir, `state-${sanitizedName}.json`);
+    
+    // Load existing state or create new
+    this.state = this.loadState();
+  }
+  
+  loadState() {
+    if (fs.existsSync(this.stateFile)) {
+      try {
+        const content = fs.readFileSync(this.stateFile, 'utf-8');
+        return JSON.parse(content);
+      } catch (err) {
+        console.log(`⚠️  Could not load state file: ${err.message}`);
+      }
+    }
+    return { passedCards: [], timestamp: new Date().toISOString() };
+  }
+  
+  saveState() {
+    try {
+      fs.writeFileSync(this.stateFile, JSON.stringify(this.state, null, 2));
+    } catch (err) {
+      console.log(`⚠️  Could not save state file: ${err.message}`);
+    }
+  }
+  
+  hasCardPassed(tabIndex, cardIndex) {
+    const cardKey = `tab${tabIndex}-card${cardIndex}`;
+    return this.state.passedCards.includes(cardKey);
+  }
+  
+  markCardPassed(tabIndex, cardIndex) {
+    const cardKey = `tab${tabIndex}-card${cardIndex}`;
+    if (!this.state.passedCards.includes(cardKey)) {
+      this.state.passedCards.push(cardKey);
+      this.saveState();
+      console.log(`  │  │  ✅ Card marked as passed: ${cardKey}`);
+    }
+  }
+  
+  clear() {
+    if (fs.existsSync(this.stateFile)) {
+      fs.unlinkSync(this.stateFile);
+    }
+  }
+  
+  getStats() {
+    return {
+      totalPassed: this.state.passedCards.length,
+      timestamp: this.state.timestamp
+    };
+  }
+}
 
 class PlansPage {
   constructor(page) {
@@ -51,6 +117,8 @@ class CartPage {
 }
 
 test.describe('Creative Cloud Plans Page Monitoring', () => {
+  // Enable retries - only failed cards will be retested
+  test.describe.configure({ retries: 2 });
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/plans.html';
   console.log('\n' + '='.repeat(80));
@@ -72,6 +140,17 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
     const plansPage = new PlansPage(page);
     await plansPage.pageLoadOk.waitFor({ state: 'attached', timeout: 20000 });
+    
+    // Initialize state manager for tracking passed cards
+    const stateManager = new TestStateManager(testUrl);
+    const stats = stateManager.getStats();
+    
+    if (stats.totalPassed > 0) {
+      console.log('\n' + '🔄'.repeat(40));
+      console.log(`🔄 RETRY DETECTED - Skipping ${stats.totalPassed} already passed card(s)`);
+      console.log(`   Previous run timestamp: ${stats.timestamp}`);
+      console.log('🔄'.repeat(40) + '\n');
+    }
 
     const tabResults = [];
     const cardResults = [];
@@ -106,139 +185,189 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       await page.screenshot({ path: `screenshots/plans-tab-${i + 1}.png`});
 
       for (let j = 0; j < merchCards.length; j++) {
-        const merchCard = new MerchCard(merchCards[j]);
-        await merchCard.productName.waitFor({ state: 'visible', timeout: 10000 });
-        const productName = await merchCard.productName.textContent();
-        let cardPrice = 'N/A';
-        if (await merchCard.price.count() > 0) {
-          cardPrice = await merchCard.price.first().textContent();
+        // Check if this card already passed in a previous run
+        if (stateManager.hasCardPassed(i, j)) {
+          console.log(`  │  ⏭️  Skipping already passed card: Tab ${i + 1}, Card ${j + 1}`);
+          continue;
         }
-        console.log(`  │`);
-        console.log(`  │  ├─ Card ${j + 1}/${merchCards.length}: "${productName}"`);
-        console.log(`  │  │  Price: ${cardPrice}`);
-
-        const cardResult = {
+        
+        let cardResult = {
           tabIndex: i,
           tabTitle: tabTitle,
           cardIndex: j,
-          cardTitle: productName,
-          cardPrice: cardPrice,
         };
-
-        await merchCard.card.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}.png`});
-
-        if (await merchCard.checkoutLink.count() === 0) {
-          console.log(`  │  │  ⚠️  No checkout link found`);
-          cardResults.push(cardResult);
-          continue;
-        }
-
-        cardResult.ctaText = await merchCard.checkoutLink.first().textContent();
-
-        // checkout link could open a new page or a model. need to handle both cases.
-        const [newPage] = await Promise.all([
-          page.context().waitForEvent('page', { timeout: 5000 }).catch(() => null),
-          merchCard.checkoutLink.first().click()
-        ]);
-
-        const newUrl = await page.url();
         
-        if (newPage) {
-          const newPageUrl = newPage.url();
-          console.log(`  │  │  🔗 New page opened`);
-          console.log(`  │  │     URL: ${newPageUrl}`);
-          await newPage.waitForTimeout(5000);
-          await newPage.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-new-page.png`});
-          await newPage.close();
-        } else if (newUrl.startsWith(testUrl)) {
-          console.log(`  │  │  🎭 Modal opened`);
-          await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-modal.png`});
+        // Track if any option has errors for this card (for pass/fail determination)
+        let cardHasOptionErrors = false;
+        
+        try {
+          const merchCard = new MerchCard(merchCards[j]);
+          await merchCard.productName.waitFor({ state: 'visible', timeout: 10000 });
+          const productName = await merchCard.productName.textContent();
+          let cardPrice = 'N/A';
+          if (await merchCard.price.count() > 0) {
+            cardPrice = await merchCard.price.first().textContent();
+          }
+          console.log(`  │`);
+          console.log(`  │  ├─ Card ${j + 1}/${merchCards.length}: "${productName}"`);
+          console.log(`  │  │  Price: ${cardPrice}`);
 
-          await plansPage.modalIframe.waitFor({ state: 'visible', timeout: 10000 });
-          const modalIframeSrc = await plansPage.modalIframe.getAttribute('src');
-          console.log(`  │  │     Iframe: ${modalIframeSrc}`);
-          if (!modalIframeSrc.startsWith('https://commerce.adobe.com/store/segmentation')) {
-            cardResult.error = `Iframe src ${modalIframeSrc} is not valid`;
-            console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
+          cardResult.cardTitle = productName;
+          cardResult.cardPrice = cardPrice;
+
+          await merchCard.card.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}.png`});
+
+          if (await merchCard.checkoutLink.count() === 0) {
+            console.log(`  │  │  ⚠️  No checkout link found`);
+            cardResults.push(cardResult);
+            continue;
           }
 
-          const modal = new Modal(await plansPage.modalIframe.contentFrame());
-          await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
-          await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+          cardResult.ctaText = await merchCard.checkoutLink.first().textContent();
 
-          await modal.selectedPriceOption.waitFor({ state: 'visible', timeout: 10000 });
-          const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
-          console.log(`  │  │     Selected: ${selectedPriceOption}`);
-          if (selectedPriceOption.replace(/[^\d.]/g, '') !== cardPrice.replace(/[^\d.]/g, '')) {
-            cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
-            console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
-          } else {
-            console.log(`  │  │     ✓ Price matches card price`);
-          }
+          // checkout link could open a new page or a model. need to handle both cases.
+          const [newPage] = await Promise.all([
+            page.context().waitForEvent('page', { timeout: 5000 }).catch(() => null),
+            merchCard.checkoutLink.first().click()
+          ]);
+
+          const newUrl = await page.url();
           
-          const priceOptions = await modal.priceOptions.all();
-          const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
-          console.log(`  │  │     Testing ${priceOptions.length} price option${priceOptions.length !== 1 ? 's' : ''}: [${priceOptionTexts.join(', ')}]`);
-          for (let k = 0; k < priceOptions.length; k++) {
-            const optionResult = {
-              tabIndex: i,
-              tabTitle: tabTitle,
-              cardIndex: j,
-              cardTitle: productName,
-              optionIndex: k,
-              optionTitle: priceOptionTexts[k],
-            };
-            
-            const priceOption = priceOptions[k];
-            await priceOption.click();
-            await page.waitForTimeout(1000);
-            await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
-            await modal.continueButton.first().click();
-            await page.waitForTimeout(5000);
+          if (newPage) {
+            const newPageUrl = newPage.url();
+            console.log(`  │  │  🔗 New page opened`);
+            console.log(`  │  │     URL: ${newPageUrl}`);
+            await newPage.waitForTimeout(5000);
+            await newPage.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-new-page.png`});
+            await newPage.close();
+          } else if (newUrl.startsWith(testUrl)) {
+            console.log(`  │  │  🎭 Modal opened`);
+            await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-modal.png`});
 
-            await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png`});
-
-            const cartPage = new CartPage(page);
-            await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 10000 });
-            const cartTotal = await cartPage.cartTotal.first().textContent();
-            console.log(`  │  │       → Option ${k + 1}/${priceOptions.length}: ${priceOptionTexts[k]}`);
-            console.log(`  │  │          Cart total: ${cartTotal}`);
-
-            if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionTexts[k].replace(/[^\d.]/g, '')) {
-              optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionTexts[k]} for tab \"${tabTitle}\" card \"${productName}\"`;
-              console.log(`  │  │          ✗ ERROR: Price mismatch`);
-            } else {
-              console.log(`  │  │          ✓ Price matches`);
-            }
-
-            optionResults.push(optionResult);
-
-            await page.goBack();
-            await page.waitForTimeout(1000);
-
-            if (newUrl === testUrl) {
-              await merchCard.checkoutLink.first().click();
-              await page.waitForTimeout(5000);
-              await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
-              await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
-            }
-          }
-          await plansPage.modalCloseButton.first().click();
-        } else {
-          console.log(`  │  │  🔀 Redirected to: ${newUrl}`);
-          await page.waitForTimeout(5000);
-          await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-redirected.png`});
-
-          if (cardPrice !== 'N/A') {
-            const redirectedPageContent = await page.textContent('body');
-            if (redirectedPageContent.includes(cardPrice)) {
-              console.log(`  │  │     ✓ Card price found in redirected page`);
-            } else {
-              cardResult.error = `Card price ${cardPrice} not found in redirected page content for tab \"${tabTitle}\" card \"${productName}\"`;
+            await plansPage.modalIframe.waitFor({ state: 'visible', timeout: 10000 });
+            const modalIframeSrc = await plansPage.modalIframe.getAttribute('src');
+            console.log(`  │  │     Iframe: ${modalIframeSrc}`);
+            if (!modalIframeSrc.startsWith('https://commerce.adobe.com/store/segmentation')) {
+              cardResult.error = `Iframe src ${modalIframeSrc} is not valid`;
               console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
             }
+
+            const modal = new Modal(await plansPage.modalIframe.contentFrame());
+            await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
+            await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+
+            await modal.selectedPriceOption.waitFor({ state: 'visible', timeout: 10000 });
+            const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
+            console.log(`  │  │     Selected: ${selectedPriceOption}`);
+            if (selectedPriceOption.replace(/[^\d.]/g, '') !== cardPrice.replace(/[^\d.]/g, '')) {
+              cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
+              console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
+            } else {
+              console.log(`  │  │     ✓ Price matches card price`);
+            }
+            
+            const priceOptions = await modal.priceOptions.all();
+            const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
+            console.log(`  │  │     Testing ${priceOptions.length} price option${priceOptions.length !== 1 ? 's' : ''}: [${priceOptionTexts.join(', ')}]`);
+            
+            for (let k = 0; k < priceOptions.length; k++) {
+              const optionResult = {
+                tabIndex: i,
+                tabTitle: tabTitle,
+                cardIndex: j,
+                cardTitle: productName,
+                optionIndex: k,
+                optionTitle: priceOptionTexts[k],
+              };
+              
+              const priceOption = priceOptions[k];
+              await priceOption.click();
+              await page.waitForTimeout(1000);
+              await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
+              await modal.continueButton.first().click();
+              await page.waitForTimeout(5000);
+
+              await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png`});
+
+              const cartPage = new CartPage(page);
+              await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 10000 });
+              const cartTotal = await cartPage.cartTotal.first().textContent();
+              console.log(`  │  │       → Option ${k + 1}/${priceOptions.length}: ${priceOptionTexts[k]}`);
+              console.log(`  │  │          Cart total: ${cartTotal}`);
+
+              if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionTexts[k].replace(/[^\d.]/g, '')) {
+                optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionTexts[k]} for tab \"${tabTitle}\" card \"${productName}\"`;
+                console.log(`  │  │          ✗ ERROR: Price mismatch`);
+                cardHasOptionErrors = true;
+              } else {
+                console.log(`  │  │          ✓ Price matches`);
+              }
+
+              optionResults.push(optionResult);
+
+              await page.goBack();
+              await page.waitForTimeout(1000);
+
+              if (newUrl === testUrl) {
+                await merchCard.checkoutLink.first().click();
+                await page.waitForTimeout(5000);
+                await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
+                await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+              }
+            }
+            
+            await plansPage.modalCloseButton.first().click();
+          } else {
+            console.log(`  │  │  🔀 Redirected to: ${newUrl}`);
+            await page.waitForTimeout(5000);
+            await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-redirected.png`});
+
+            if (cardPrice !== 'N/A') {
+              const redirectedPageContent = await page.textContent('body');
+              if (redirectedPageContent.includes(cardPrice)) {
+                console.log(`  │  │     ✓ Card price found in redirected page`);
+              } else {
+                cardResult.error = `Card price ${cardPrice} not found in redirected page content for tab \"${tabTitle}\" card \"${productName}\"`;
+                console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
+              }
+            }
+            await page.goBack();
           }
-          await page.goBack();
+          
+          // Mark card as passed if no errors occurred (check both card errors and option errors)
+          if (!cardResult.error && !cardHasOptionErrors) {
+            stateManager.markCardPassed(i, j);
+          }
+          
+        } catch (error) {
+          // Catch any exception during card testing
+          const errorMessage = `Exception during card test: ${error.message}`;
+          console.log(`  │  │  ⚠️  EXCEPTION: ${errorMessage}`);
+          console.log(`  │  │     Stack: ${error.stack}`);
+          
+          cardResult.error = errorMessage;
+          cardResult.cardTitle = cardResult.cardTitle || `Card ${j + 1}`;
+          
+          // Take screenshot of current state for debugging
+          try {
+            await page.screenshot({ 
+              path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-exception.png`,
+              fullPage: true 
+            });
+          } catch (screenshotError) {
+            console.log(`  │  │     Failed to capture exception screenshot: ${screenshotError.message}`);
+          }
+          
+          // Card will NOT be marked as passed, so it will be retried
+          console.log(`  │  │  🔄 Card will be retried on next run`);
+
+          try {
+            await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
+          } catch (err) {
+            console.log('Timeout on Waiting for network idle!');
+          }
+          await tabs[i].click();
+          await page.waitForTimeout(1000);
         }
 
         cardResults.push(cardResult);
@@ -268,7 +397,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       console.log('\n' + '='.repeat(80) + '\n');
       expect(errorResults.length).toBe(0);
     } else {
+      // Test passed completely - clear the state file for next run
       console.log('\n✅ All tests passed successfully!');
+      console.log('🧹 Clearing state file for next run...');
+      stateManager.clear();
       console.log('='.repeat(80) + '\n');
     }
   });

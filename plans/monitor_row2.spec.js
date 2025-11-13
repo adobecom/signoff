@@ -478,6 +478,14 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           
           // Card will NOT be marked as passed, so it will be retried
           console.log(`   🔄 Card will be retried on next run`);
+
+          try {
+            await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
+          } catch (err) {
+            console.log('Timeout on Waiting for network idle!');
+          }
+          await tabs[i].click();
+          await page.waitForTimeout(1000);
         }
         
         cardResults.push(cardResult);
