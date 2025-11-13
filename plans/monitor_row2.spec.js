@@ -102,7 +102,7 @@ class Modal {
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
     this.priceOptions = modal.locator('.subscription-panel-offer-price :not([class*="strikethrough"])>[data-wcs-type="price"]').filter({visible: true});
-    this.selectedPriceOption = modal.locator('input[checked] + label :not([class*="strikethrough"])>[data-wcs-type="price"]').filter({visible: true});
+    this.selectedPriceOption = modal.locator('input[checked] + label .subscription-panel-offer-price :not([class*="strikethrough"])>[data-wcs-type="price"]').filter({visible: true});
     this.continueButton = modal.locator('.spectrum-Button--cta').filter({visible: true});
   }
 }
@@ -262,7 +262,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       };
 
       await tab.click();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
       const tabPanel = await plansPage.getTabPanel(tab);
       const merchCards = await plansPage.getMerchCards(tabPanel);
       console.log(`📋 Found ${merchCards.length} merch card${merchCards.length !== 1 ? 's' : ''} in this tab`);  
