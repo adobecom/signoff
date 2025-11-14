@@ -101,8 +101,8 @@ class Modal {
     this.modal = modal;
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
-    this.priceOptions = modal.locator('.subscription-panel-offer-price :not([class*="strikethrough"])>[data-wcs-type="price"]').filter({visible: true});
-    this.selectedPriceOption = modal.locator('input[checked] + label .subscription-panel-offer-price :not([class*="strikethrough"])>[data-wcs-type="price"]').filter({visible: true});
+    this.priceOptions = modal.locator('.subscription-panel-offer .subscription-panel-offer-price [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
+    this.selectedPriceOption = modal.locator('input[checked]+label .subscription-panel-offer-price [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
     this.continueButton = modal.locator('.spectrum-Button--cta').filter({visible: true});
   }
 }
