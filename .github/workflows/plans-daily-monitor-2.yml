@@ -53,6 +53,41 @@ jobs:
           TEST_URL: ${{ inputs.test_url }}
           USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
 
+      - name: Process error reports
+        if: failure()
+        id: process-errors
+        run: |
+          # Install jq if not available
+          if ! command -v jq &> /dev/null; then
+            apt-get update && apt-get install -y jq
+          fi
+          
+          ERROR_SUMMARY=""
+          if [ -d "test-results" ] && [ -n "$(ls -A test-results/error-report-*.json 2>/dev/null)" ]; then
+            echo "Found error report files"
+            for file in test-results/error-report-*.json; do
+              if [ -f "$file" ]; then
+                echo "Processing $file"
+                TEST_NAME=$(jq -r '.testName' "$file")
+                ERROR_COUNT=$(jq -r '.errorCount' "$file")
+                ERRORS=$(jq -r '.errors | join("\n• ")' "$file")
+                
+                ERROR_SUMMARY="${ERROR_SUMMARY}
+          
+          **${TEST_NAME}** (${ERROR_COUNT} error(s)):
+          • ${ERRORS}
+          "
+              fi
+            done
+          else
+            ERROR_SUMMARY="No detailed error information available. Check the logs for details."
+          fi
+          
+          # Save to GitHub output using heredoc to handle multiline
+          echo "ERROR_SUMMARY<<EOF" >> $GITHUB_OUTPUT
+          echo "$ERROR_SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -61,6 +96,7 @@ jobs:
           path: |
             playwright-report/
             screenshots/
+            test-results/
           retention-days: 30
 
       - name: Slack notification on success
@@ -92,6 +128,9 @@ jobs:
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             Test URL: https://www.adobe.com/creativecloud/plans.html
+            
+            ${{ steps.process-errors.outputs.ERROR_SUMMARY }}
+            
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_TITLE: ❌ Plans US Monitor 🇺🇸 - FAILURE
           SLACK_FOOTER: ""

@@ -1,0 +1,145 @@
+name: Plans Daily Monitor on Win/Mac
+
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Test URL'
+        required: false
+        type: string
+      slack_channel_passed:
+        description: 'Slack channel for passed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
+      slack_channel_failed:
+        description: 'Slack channel for failed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
+
+jobs:
+  monitor:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            browser: chromium
+          # - os: macos-latest
+          #   browser: webkit
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run plans monitor
+        run: npx playwright test plans/monitor2.spec.js --project=${{ matrix.browser }}
+        env:
+          TEST_URL: ${{ inputs.test_url }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Process error reports
+        if: failure()
+        id: process-errors
+        shell: bash
+        run: |
+          ERROR_SUMMARY=""
+          if [ -d "test-results" ] && [ -n "$(ls -A test-results/error-report-*.json 2>/dev/null)" ]; then
+            echo "Found error report files"
+            
+            # Use Node.js to parse JSON (works cross-platform)
+            for file in test-results/error-report-*.json; do
+              if [ -f "$file" ]; then
+                echo "Processing $file"
+                ERROR_LINE=$(node -e "
+                  const fs = require('fs');
+                  const data = JSON.parse(fs.readFileSync('$file', 'utf8'));
+                  const errors = data.errors.join('\\n• ');
+                  console.log(\`**\${data.testName}** (\${data.errorCount} error(s)):\\n• \${errors}\`);
+                ")
+                ERROR_SUMMARY="${ERROR_SUMMARY}${ERROR_LINE}\n\n"
+              fi
+            done
+          else
+            ERROR_SUMMARY="No detailed error information available. Check the logs for details."
+          fi
+          
+          # Save to GitHub output
+          echo "ERROR_SUMMARY<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$ERROR_SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: plans-monitor-results-${{ matrix.browser }}-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+            test-results/
+          retention-days: 30
+
+      - name: Slack notification on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "channel": "${{ inputs.slack_channel_passed || 'loot-loaders-tests' }}",
+              "username": "Plans US Monitor",
+              "icon_url": "https://github.com/actions.png?size=48",
+              "attachments": [
+                {
+                  "color": "good",
+                  "title": "✅ Plans US Monitor 🇺🇸 - SUCCESS",
+                  "text": "OS: ${{ matrix.os }}\nBrowser: ${{ matrix.browser }}\nTest URL: https://www.adobe.com/creativecloud/plans.html\nView details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Slack notification on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "channel": "${{ github.event_name == 'schedule' && 'loot-loaders-tests' || inputs.slack_channel_failed || 'loot-loaders-tests' }}",
+              "username": "Plans US Monitor",
+              "icon_url": "https://github.com/actions.png?size=48",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "title": "❌ Plans US Monitor 🇺🇸 - FAILURE",
+                  "text": "OS: ${{ matrix.os }}\nBrowser: ${{ matrix.browser }}\nTest URL: https://www.adobe.com/creativecloud/plans.html\n\n${{ steps.process-errors.outputs.ERROR_SUMMARY }}\n\nView details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
