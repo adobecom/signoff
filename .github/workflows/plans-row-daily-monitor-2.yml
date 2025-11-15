@@ -221,52 +221,84 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          # Format time as HH:MM (with leading zeros)
-          CURRENT_TIME=$(date -u '+%H:%M')
+          # Get current hour and minute
+          CURRENT_HOUR=$(date -u '+%H' | sed 's/^0//')
+          CURRENT_MINUTE=$(date -u '+%M' | sed 's/^0//')
           
-          echo "Current UTC time: $CURRENT_TIME"
+          echo "Current UTC time: $(date -u '+%H:%M') (Hour: $CURRENT_HOUR, Minute: $CURRENT_MINUTE)"
 
           if [ "${{ github.event_name }}" == "schedule" ]; then
-            # Build matrix based on current time
+            # Build matrix based on current time (with 30-minute tolerance for queue delays)
             MATRIX='{"include":['
             FIRST=true
             
+            # Function to check if current time is within 30 minutes of any scheduled time
+            check_schedule() {
+              local schedules="$1"
+              for sched in $schedules; do
+                IFS=':' read -r sched_hour sched_min <<< "$sched"
+                sched_hour=$((10#$sched_hour))
+                sched_min=$((10#$sched_min))
+                
+                # Calculate time difference in minutes
+                time_diff=$(( (CURRENT_HOUR * 60 + CURRENT_MINUTE) - (sched_hour * 60 + sched_min) ))
+                
+                # Handle day boundary
+                if [ $time_diff -lt -720 ]; then
+                  time_diff=$((time_diff + 1440))
+                elif [ $time_diff -gt 720 ]; then
+                  time_diff=$((time_diff - 1440))
+                fi
+                
+                # Check if within 30 minutes
+                if [ $time_diff -ge 0 ] && [ $time_diff -le 30 ]; then
+                  return 0
+                fi
+              done
+              return 1
+            }
+            
             # UK schedules
-            if [[ "$CURRENT_TIME" =~ ^(06:00|08:00|09:50|11:40|13:30|15:20|17:10|19:00|20:00|23:30)$ ]]; then
+            if check_schedule "06:00 08:00 09:50 11:40 13:30 15:20 17:10 19:00 20:00 23:30"; then
               [ "$FIRST" = false ] && MATRIX+=","
               MATRIX+='{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}'
               FIRST=false
+              echo "✓ UK matched"
             fi
             
             # Japan schedules
-            if [[ "$CURRENT_TIME" =~ ^(21:00|23:00|00:50|02:40|04:30|06:20|08:10|10:00|11:00|14:30)$ ]]; then
+            if check_schedule "21:00 23:00 00:50 02:40 04:30 06:20 08:10 10:00 11:00 14:30"; then
               [ "$FIRST" = false ] && MATRIX+=","
               MATRIX+='{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}'
               FIRST=false
+              echo "✓ Japan matched"
             fi
             
             # Germany, France, Spain, Italy schedules (same timezone)
-            if [[ "$CURRENT_TIME" =~ ^(05:00|07:00|08:50|10:40|12:30|14:20|16:10|18:00|19:00|22:30)$ ]]; then
+            if check_schedule "05:00 07:00 08:50 10:40 12:30 14:20 16:10 18:00 19:00 22:30"; then
               for locale_data in "de:Germany" "fr:France" "es:Spain" "it:Italy"; do
                 IFS=':' read -r code name <<< "$locale_data"
                 [ "$FIRST" = false ] && MATRIX+=","
                 MATRIX+="{\"url\":\"https://www.adobe.com/$code/creativecloud/plans.html\",\"locale\":\"$name\"}"
                 FIRST=false
               done
+              echo "✓ Germany/France/Spain/Italy matched"
             fi
             
             # India schedules
-            if [[ "$CURRENT_TIME" =~ ^(00:30|02:30|04:20|06:10|08:00|09:50|11:40|13:30|14:30|18:00)$ ]]; then
+            if check_schedule "00:30 02:30 04:20 06:10 08:00 09:50 11:40 13:30 14:30 18:00"; then
               [ "$FIRST" = false ] && MATRIX+=","
               MATRIX+='{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}'
               FIRST=false
+              echo "✓ India matched"
             fi
             
             # Brazil schedules
-            if [[ "$CURRENT_TIME" =~ ^(09:00|11:00|12:50|14:40|16:30|18:20|20:10|22:00|23:00|02:30)$ ]]; then
+            if check_schedule "09:00 11:00 12:50 14:40 16:30 18:20 20:10 22:00 23:00 02:30"; then
               [ "$FIRST" = false ] && MATRIX+=","
               MATRIX+='{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}'
               FIRST=false
+              echo "✓ Brazil matched"
             fi
             
             MATRIX+=']}'
