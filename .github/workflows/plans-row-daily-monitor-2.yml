@@ -1,4 +1,24 @@
 name: Plans ROW Daily Monitor 2
+# 
+# Smart per-locale frequency adjustment:
+# - Normal mode: Tests run 10x per day per locale
+# - Faulty mode: Specific locales run 1x per day (reduces alert fatigue during known issues)
+#
+# To reduce test frequency for specific locales:
+#   1. Go to: Settings > Secrets and variables > Actions > Variables tab
+#   2. Create/edit variable: PLANS_FAULTY_LOCALES
+#   3. Set value to comma-separated locale codes (e.g., "uk,jp,de")
+#   4. Faulty locales will automatically reduce to 1x per day at 6am local time
+#   5. Failures for faulty locales will route to 'loot-loaders-tests' instead of 'acom-commerce-alerts'
+#   6. Remove locales from list or clear variable to restore normal 10x per day frequency
+#
+# Supported locale codes:
+#   uk, jp, de, fr, es, it, in, br
+#
+# Example values:
+#   - "uk" - Only UK runs 1x per day
+#   - "uk,jp,br" - UK, Japan, and Brazil run 1x per day
+#   - "" or unset - All locales run 10x per day (normal mode)
 
 on:
   schedule:
@@ -218,6 +238,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      faulty_locales: ${{ steps.set-matrix.outputs.faulty_locales }}
     steps:
       - id: set-matrix
         run: |
@@ -226,67 +247,134 @@ jobs:
             SCHEDULE="${{ github.event.schedule }}"
             echo "Triggered by cron schedule: $SCHEDULE"
             
-            # Map each cron schedule to its locale(s)
+            # Load faulty locales list (comma-separated locale codes)
+            FAULTY_LOCALES="${{ vars.PLANS_FAULTY_LOCALES || '' }}"
+            echo "Faulty locales (reduced frequency): ${FAULTY_LOCALES:-none}"
+            
+            # Define reduced schedule (1x per day) for each locale code
+            declare -A REDUCED_SCHEDULES
+            REDUCED_SCHEDULES["uk"]="0 6 * * *"
+            REDUCED_SCHEDULES["jp"]="0 21 * * *"
+            REDUCED_SCHEDULES["de"]="0 5 * * *"
+            REDUCED_SCHEDULES["fr"]="0 5 * * *"
+            REDUCED_SCHEDULES["es"]="0 5 * * *"
+            REDUCED_SCHEDULES["it"]="0 5 * * *"
+            REDUCED_SCHEDULES["in"]="30 0 * * *"
+            REDUCED_SCHEDULES["br"]="0 9 * * *"
+            
+            # Helper function to check if locale is in faulty list
+            is_faulty_locale() {
+              local locale="$1"
+              if [ -z "$FAULTY_LOCALES" ]; then
+                return 1  # Not in faulty list (empty list)
+              fi
+              echo ",$FAULTY_LOCALES," | grep -q ",$locale,"
+              return $?
+            }
+            
+            # Helper function to check if locale should run at this schedule
+            should_run_locale() {
+              local locale="$1"
+              if ! is_faulty_locale "$locale"; then
+                return 0  # Not a faulty locale, always run
+              fi
+              
+              # Is a faulty locale - only run at reduced schedule
+              local reduced_sched="${REDUCED_SCHEDULES[$locale]}"
+              if [ "$SCHEDULE" = "$reduced_sched" ]; then
+                echo "  ⚠️  $locale: FAULTY MODE - Running reduced schedule (1x per day)"
+                return 0
+              else
+                echo "  ⏭️  $locale: FAULTY MODE - Skipping (not in reduced schedule window)"
+                return 1
+              fi
+            }
+            
+            # Build matrix by filtering locales based on fault list
+            build_matrix() {
+              local matrix='{"include":['
+              local first=true
+              
+              for item in "$@"; do
+                IFS='|' read -r url locale <<< "$item"
+                
+                if should_run_locale "$locale"; then
+                  [ "$first" = false ] && matrix+=","
+                  matrix+="{\"url\":\"$url\",\"locale\":\"$locale\"}"
+                  first=false
+                fi
+              done
+              
+              matrix+=']}'
+              echo "$matrix"
+            }
+            
+            # Map each cron schedule to its locale(s), then filter by faulty list
+            MATRIX=""
             case "$SCHEDULE" in
               # UK only schedules
-              "0 6 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
-              "20 15 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
-              "10 17 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
-              "0 20 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
-              "30 23 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"}]}' >> $GITHUB_OUTPUT ;;
+              "0 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "20 15 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "10 17 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "0 20 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "30 23 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
               
               # Japan only schedules
-              "0 21 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
-              "50 0 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
-              "40 2 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
-              "30 4 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
-              "20 6 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
-              "10 8 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
-              "0 10 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"}]}' >> $GITHUB_OUTPUT ;;
+              "0 21 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "50 0 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "40 2 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "30 4 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "20 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "10 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "0 10 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
               
               # Germany, France, Spain, Italy only schedules (all same timezone - run together)
-              "0 5 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "0 7 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "50 8 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "40 10 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "30 12 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "20 14 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "10 16 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "30 22 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
+              "0 5 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "0 7 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "50 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "40 10 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "30 12 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "20 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "10 16 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "30 22 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
               
               # India only schedules
-              "30 0 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "20 4 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "10 6 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
+              "30 0 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "20 4 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "10 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               
               # Brazil only schedules
-              "0 9 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "50 12 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "40 14 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "30 16 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "20 18 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "10 20 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "0 22 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
+              "0 9 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "50 12 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "40 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "30 16 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "20 18 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "10 20 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "0 22 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
               
               # Overlapping schedules - run multiple locales
-              "0 8 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "50 9 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "40 11 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "30 13 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "30 14 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "0 18 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"}]}' >> $GITHUB_OUTPUT ;;
-              "0 19 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"}]}' >> $GITHUB_OUTPUT ;;
-              "0 23 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "0 11 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
-              "30 2 * * *") echo 'matrix={"include":[{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT ;;
+              "0 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "50 9 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "40 11 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "30 13 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "30 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "0 18 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "0 19 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "0 23 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "0 11 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "30 2 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
               
               # Default: empty matrix
-              *) echo 'matrix={"include":[]}' >> $GITHUB_OUTPUT ;;
+              *) MATRIX='{"include":[]}' ;;
             esac
+            
+            echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+            echo "faulty_locales=$FAULTY_LOCALES" >> $GITHUB_OUTPUT
+            echo "Generated matrix: $MATRIX"
             
           elif [ "${{ inputs.locale }}" == "all" ]; then
             # Manual trigger with no locale: run all
-            echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"UK"},{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"Japan"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"Germany"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"France"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"Spain"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"Italy"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"India"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"Brazil"}]}' >> $GITHUB_OUTPUT
+            echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"uk"},{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"jp"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"de"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"fr"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"es"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"it"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"in"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"br"}]}' >> $GITHUB_OUTPUT
           else
             # Manual trigger with specific locale
             LOCALE="${{ inputs.locale }}"
@@ -376,6 +464,20 @@ jobs:
             test-results/
           retention-days: 30
 
+      - name: Check if locale is in faulty mode
+        id: check-faulty
+        run: |
+          FAULTY_LOCALES="${{ needs.filter-matrix.outputs.faulty_locales }}"
+          CURRENT_LOCALE="${{ matrix.locale }}"
+          
+          if echo ",$FAULTY_LOCALES," | grep -q ",$CURRENT_LOCALE,"; then
+            echo "is_faulty=true" >> $GITHUB_OUTPUT
+            echo "Locale $CURRENT_LOCALE is in FAULTY MODE"
+          else
+            echo "is_faulty=false" >> $GITHUB_OUTPUT
+            echo "Locale $CURRENT_LOCALE is in NORMAL MODE"
+          fi
+
       - name: Slack notification on success
         if: success()
         uses: rtCamp/action-slack-notify@v2
@@ -386,9 +488,10 @@ jobs:
           SLACK_USERNAME: Plans ROW Monitor 2
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
-          SLACK_TITLE: ✅ Plans ROW Monitor (${{ matrix.locale }}) - SUCCESS
+          SLACK_TITLE: ✅ Plans ROW Monitor (${{ matrix.locale }}) - SUCCESS${{ steps.check-faulty.outputs.is_faulty == 'true' && ' [Faulty Mode - Reduced Frequency]' || '' }}
           SLACK_MESSAGE: |
             Test URL: ${{ env.TEST_URL }}
+            ${{ steps.check-faulty.outputs.is_faulty == 'true' && '⚠️  Running in FAULTY MODE (1x per day - 6am local)' || '' }}
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
@@ -397,7 +500,7 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: ${{ github.event_name == 'schedule' && 'acom-commerce-alerts' || inputs.slack_channel_failed || 'loot-loaders-tests' }}
+          SLACK_CHANNEL: ${{ steps.check-faulty.outputs.is_faulty == 'true' && 'loot-loaders-tests' || (github.event_name == 'schedule' && 'acom-commerce-alerts' || inputs.slack_channel_failed || 'loot-loaders-tests') }}
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Plans ROW Monitor 2
@@ -405,10 +508,11 @@ jobs:
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             Test URL: ${{ env.TEST_URL }}
+            ${{ steps.check-faulty.outputs.is_faulty == 'true' && '⚠️  Running in FAULTY MODE (1x per day - 6am local) - Known issue, reduced alerting' || '' }}
             
             ${{ steps.process-errors.outputs.ERROR_SUMMARY }}
             
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Plans ROW Monitor (${{ matrix.locale }}) - FAILURE
+          SLACK_TITLE: ❌ Plans ROW Monitor (${{ matrix.locale }}) - FAILURE${{ steps.check-faulty.outputs.is_faulty == 'true' && ' [Known Faulty]' || '' }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
