@@ -368,17 +368,25 @@ jobs:
               *) MATRIX='{"include":[]}' ;;
             esac
             
-            echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+            echo "matrix<<EOF" >> $GITHUB_OUTPUT
+            echo "$MATRIX" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             echo "faulty_locales=$FAULTY_LOCALES" >> $GITHUB_OUTPUT
             echo "Generated matrix: $MATRIX"
             
           elif [ "${{ inputs.locale }}" == "all" ]; then
             # Manual trigger with no locale: run all
-            echo 'matrix={"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"uk"},{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"jp"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"de"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"fr"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"es"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"it"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"in"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"br"}]}' >> $GITHUB_OUTPUT
+            MATRIX='{"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"uk"},{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"jp"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"de"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"fr"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"es"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"it"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"in"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"br"}]}'
+            echo "matrix<<EOF" >> $GITHUB_OUTPUT
+            echo "$MATRIX" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           else
             # Manual trigger with specific locale
             LOCALE="${{ inputs.locale }}"
-            echo "matrix={\"include\":[{\"url\":\"https://www.adobe.com/${LOCALE}/creativecloud/plans.html\",\"locale\":\"${LOCALE}\"}]}" >> $GITHUB_OUTPUT
+            MATRIX="{\"include\":[{\"url\":\"https://www.adobe.com/${LOCALE}/creativecloud/plans.html\",\"locale\":\"${LOCALE}\"}]}"
+            echo "matrix<<EOF" >> $GITHUB_OUTPUT
+            echo "$MATRIX" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           fi
 
   monitor:
