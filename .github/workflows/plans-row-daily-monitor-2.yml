@@ -249,7 +249,7 @@ jobs:
             
             # Load faulty locales list (comma-separated locale codes)
             FAULTY_LOCALES="${{ vars.PLANS_FAULTY_LOCALES || '' }}"
-            echo "Faulty locales (reduced frequency): ${FAULTY_LOCALES:-none}"
+            echo "Faulty locales (reduced frequency): ${FAULTY_LOCALES:-none}" >&2
             
             # Define reduced schedule (1x per day) for each locale code
             declare -A REDUCED_SCHEDULES
@@ -282,10 +282,10 @@ jobs:
               # Is a faulty locale - only run at reduced schedule
               local reduced_sched="${REDUCED_SCHEDULES[$locale]}"
               if [ "$SCHEDULE" = "$reduced_sched" ]; then
-                echo "  ⚠️  $locale: FAULTY MODE - Running reduced schedule (1x per day)"
+                echo "  ⚠️  $locale: FAULTY MODE - Running reduced schedule (1x per day)" >&2
                 return 0
               else
-                echo "  ⏭️  $locale: FAULTY MODE - Skipping (not in reduced schedule window)"
+                echo "  ⏭️  $locale: FAULTY MODE - Skipping (not in reduced schedule window)" >&2
                 return 1
               fi
             }
