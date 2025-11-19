@@ -239,6 +239,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       faulty_locales: ${{ steps.set-matrix.outputs.faulty_locales }}
+      has_tests: ${{ steps.set-matrix.outputs.has_tests }}
     steps:
       - id: set-matrix
         run: |
@@ -372,7 +373,15 @@ jobs:
             echo "$MATRIX" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "faulty_locales=$FAULTY_LOCALES" >> $GITHUB_OUTPUT
-            echo "Generated matrix: $MATRIX"
+            
+            # Check if matrix is empty
+            if [ "$MATRIX" = '{"include":[]}' ]; then
+              echo "has_tests=false" >> $GITHUB_OUTPUT
+              echo "Generated matrix: $MATRIX (empty - all locales skipped in faulty mode)"
+            else
+              echo "has_tests=true" >> $GITHUB_OUTPUT
+              echo "Generated matrix: $MATRIX"
+            fi
             
           elif [ "${{ inputs.locale }}" == "all" ]; then
             # Manual trigger with no locale: run all
@@ -380,6 +389,7 @@ jobs:
             echo "matrix<<EOF" >> $GITHUB_OUTPUT
             echo "$MATRIX" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_tests=true" >> $GITHUB_OUTPUT
           else
             # Manual trigger with specific locale
             LOCALE="${{ inputs.locale }}"
@@ -387,10 +397,12 @@ jobs:
             echo "matrix<<EOF" >> $GITHUB_OUTPUT
             echo "$MATRIX" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_tests=true" >> $GITHUB_OUTPUT
           fi
 
   monitor:
     needs: filter-matrix
+    if: ${{ needs.filter-matrix.outputs.has_tests == 'true' }}
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.56.0-noble
