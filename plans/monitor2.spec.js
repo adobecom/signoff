@@ -243,7 +243,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               optionResults.push(optionResult);
 
               await page.goBack();
-              await page.waitForTimeout(1000);
+              await page.waitForTimeout(2000);
 
               if (newUrl === testUrl) {
                 await merchCard.checkoutLink.first().click();
