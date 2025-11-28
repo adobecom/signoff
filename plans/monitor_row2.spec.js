@@ -89,12 +89,6 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
   const urlPath = new URL(testUrl).pathname;
   const countryCode = urlPath.split('/').filter(Boolean)[0] || 'uk';
   console.log(`Mocking geo location with country: ${countryCode}`);
-  
-  // For JP, use a specialized testUrl
-  if (countryCode === 'jp') {
-    testUrl = testUrl + '?plan=individual&filter=all';
-    console.log(`JP Test URL: ${testUrl}`);
-  }
 
   test.beforeEach(async ({ page }) => {
     // Block Adobe messaging endpoint to disable Jarvis
@@ -186,11 +180,28 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     const cardResults = [];
     const optionResults = [];
 
-    const tabs = await plansPage.tabs.all();
+    let tabs = await plansPage.tabs.all();
 
     console.log(`Found ${tabs.length} tabs to test`);
 
+    const origTestUrl = testUrl;
+
     for (let i = 0; i < tabs.length; i++) {
+      // For JP, use a specialized testUrl for tab 0
+      if (countryCode === 'jp') {
+        if (i === 0) {
+          testUrl = testUrl + '?plan=individual&filter=all';
+        } else {
+          testUrl = origTestUrl;
+        }
+        console.log(`JP Test URL: ${testUrl}`);
+        const currUrl = await page.url();
+        if (currUrl !== testUrl) {
+          await page.goto(testUrl)
+          await page.waitForTimeout(3000);
+        }
+      }
+
       const tab = tabs[i];
       const tabTitle = await tab.textContent();
 
