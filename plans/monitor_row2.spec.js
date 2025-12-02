@@ -129,7 +129,12 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       console.log('Timeout on waiting for network idle!');
     }
     const plansPage = new PlansPage(page);
-    await plansPage.pageLoadOk.waitFor({ state: 'attached', timeout: 20000 });
+    try {
+      await plansPage.pageLoadOk.waitFor({ state: 'attached', timeout: 20000 });
+    } catch (error) {
+      console.log(`❌ Page Load OK verification failed: Cookie notice element (div.evidon-notice-link) did not appear within 20 seconds. The page may not have loaded correctly. Original error: ${error.message}`);
+      throw new Error(`div.evidon-notice-link not found`);
+    }
     
     // Filter out common non-critical errors
     const criticalErrors = errors.filter(error => 
@@ -245,7 +250,12 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         
         try {
           const merchCard = new MerchCard(merchCards[j]);
-          await merchCard.productName.first().waitFor({ state: 'visible', timeout: 10000 });
+          try {
+            await merchCard.productName.first().waitFor({ state: 'visible', timeout: 10000 });
+          } catch (error) {
+            console.log(`❌ Product name loading failed for Card ${j + 1} in Tab "${tabTitle}": Product name element (h3) did not become visible within 10 seconds. Original error: ${error.message}`);
+            throw new Error(`Product name is not found for Card ${j + 1} in Tab "${tabTitle}"`);
+          }
           const productName = await merchCard.productName.first().textContent();
           console.log(`\n${'='.repeat(60)}`);
           console.log(`📦 Product: ${productName}`);
@@ -303,10 +313,25 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               modal = new Modal(plansPage.checkoutModal);
             }
 
-            await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
-            await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+            try {
+              await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
+            } catch (error) {
+              console.log(`❌ Modal price options not found for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Price options did not become visible within 10 seconds. Original error: ${error.message}`);
+              throw new Error(`Modal price options not found for "${productName}"`);
+            }
+            try {
+              await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+            } catch (error) {
+              console.log(`❌ Modal continue button not found for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Continue button did not become visible within 10 seconds. Original error: ${error.message}`);
+              throw new Error(`Modal continue button not found for "${productName}"`);
+            }
 
-            await modal.selectedPriceOption.first().waitFor({ state: 'visible', timeout: 10000 });
+            try {
+              await modal.selectedPriceOption.first().waitFor({ state: 'visible', timeout: 10000 });
+            } catch (error) {
+              console.log(`❌ Selected price option not found for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Selected price option did not become visible within 10 seconds. Original error: ${error.message}`);
+              throw new Error(`Selected price option not found for "${productName}"`);
+            }
             if (await modal.selectedPriceOption.count() > 1) {
               const selectedPriceOptions = await modal.selectedPriceOption.all();
               const prices = await Promise.all(selectedPriceOptions.map(async(x) => await x.textContent()));
@@ -346,7 +371,12 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png`});
 
               const cartPage = new CartPage(page);
-              await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
+              try {
+                await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
+              } catch (error) {
+                console.log(`❌ Cart page load failed for "${productName}" option "${priceOptionText}" (Tab "${tabTitle}", Card ${j + 1}, Option ${k + 1}): Cart subtotal did not become visible within 20 seconds. The checkout may have failed. Original error: ${error.message}`);
+                throw new Error(`Cart subtotal not found for "${productName}" option "${priceOptionText}"`);
+              }
               const cartSubTotal = await cartPage.cartSubTotal.first().textContent();
               let cartTotal = 'N/A';
               if (await cartPage.cartTotal.count() > 0) {
@@ -382,8 +412,18 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               if (newUrl === testUrl) {
                 await merchCard.checkoutLink.first().click();
                 await page.waitForTimeout(5000);
-                await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
-                await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+                try {
+                  await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
+                } catch (error) {
+                  console.log(`❌ Modal reload failed after returning from cart for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Price options did not reappear within 10 seconds. Original error: ${error.message}`);
+                  throw new Error(`Modal price options not found after cart return for "${productName}"`);
+                }
+                try {
+                  await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+                } catch (error) {
+                  console.log(`❌ Modal reload failed after returning from cart for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Continue button did not reappear within 10 seconds. Original error: ${error.message}`);
+                  throw new Error(`Modal continue button not found after cart return for "${productName}"`);
+                }
               }
             }
             
@@ -413,9 +453,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           
         } catch (error) {
           // Catch any exception during card testing
-          const errorMessage = `Exception during card test: ${error.message}`;
+          const errorMessage = error.message;
           console.log(`\n   ⚠️  EXCEPTION: ${errorMessage}`);
-          console.log(`   Stack: ${error.stack}`);
           
           cardResult.error = errorMessage;
           cardResult.cardTitle = cardResult.cardTitle || `Card ${j + 1}`;
