@@ -198,13 +198,33 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           cardResult.ctaText = await merchCard.checkoutLink.first().textContent();
 
           // checkout link could open a new page or a model. need to handle both cases.
-          const [newPage] = await Promise.all([
-            page.context().waitForEvent('page', { timeout: 5000 }).catch(() => null),
-            merchCard.checkoutLink.first().click()
-          ]);
-
-          const newUrl = await page.url();
+          let newPage = null;
+          let newUrl = null;
           
+          try {
+            [newPage] = await Promise.all([
+              page.context().waitForEvent('page', { timeout: 5000 }).catch(() => null),
+              merchCard.checkoutLink.first().click({ timeout: 10000 })
+            ]);
+            newUrl = await page.url();
+          } catch (clickError) {
+            console.log(`  │  │  ⚠️  Click failed: ${clickError.message}`);
+            console.log(`  │  │  Skipping this card and continuing to next...`);
+            cardResult.error = `Checkout link click failed: ${clickError.message}`;
+            cardResults.push(cardResult);
+            
+            // Navigate back to the plans page to continue with next cards
+            try {
+              await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
+            } catch (err) {
+              console.log('  │  │  Timeout on waiting for network idle!');
+            }
+            await tabs[i].click();
+            await page.waitForTimeout(1000);
+            continue;
+          }
+          
+          // If click succeeded, continue with the checkout flow
           if (newPage) {
             const newPageUrl = newPage.url();
             console.log(`  │  │  🔗 New page opened`);
