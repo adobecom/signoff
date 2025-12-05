@@ -436,7 +436,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
             if (cardPrice !== 'N/A') {
               const redirectedPageContent = await page.textContent('body');
-              const normalizedCardPrice = cardPrice.split('/')[0].replace(/[^\d.]/g, '');
+              let normalizedCardPrice = cardPrice.split('/')[0];
+              // locale il_he redirect to il_en
+              if (countryCode === 'il_he') {
+                normalizedCardPrice = normalizedCardPrice.replace(/[^\d.]/g, '');
+              }
               if (redirectedPageContent.includes(normalizedCardPrice)) {
                 console.log(`Card price found in redirected page content`);
               } else {
