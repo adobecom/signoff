@@ -1,0 +1,95 @@
+name: Plans Daily Monitor 3
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Test URL'
+        required: false
+        type: string
+      slack_channel_passed:
+        description: 'Slack channel for passed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Run plans monitor
+        run: npx playwright test plans/monitor2.spec.js --project=chromium
+        env:
+          TEST_URL: ${{ inputs.test_url }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: plans-monitor-results-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+            test-results/
+          retention-days: 30
+
+      - name: Slack notification on success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: ${{ inputs.slack_channel_passed || 'loot-loaders-tests' }}
+          SLACK_COLOR: good
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: Plans US Monitor 2
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_TITLE: ✅ Plans US Monitor 🇺🇸 - SUCCESS
+          SLACK_MESSAGE: |
+            Test URL: https://www.adobe.com/creativecloud/plans.html
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_FOOTER: ""
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Trigger log analysis
+        if: failure()
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          echo "Triggering analyze-logs workflow for failed test run"
+          echo "Run URL: ${RUN_URL}"
+          
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/analyze-logs.yml/dispatches" \
+            -d "{\"ref\":\"${{ github.ref_name }}\",\"inputs\":{\"run_url\":\"${RUN_URL}\"}}"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Successfully triggered analyze-logs workflow"
+          else
+            echo "⚠️ Failed to trigger analyze-logs workflow"
+          fi
+
