@@ -35,7 +35,7 @@ jobs:
           
           # Trigger CircleCI pipeline
           RESPONSE=$(curl -X POST \
-            --url "https://cci-ghec.ci.adobe.com/api/v2/project/gh/Adobe-acom/alert/pipeline" \
+            --url "https://cci-ghec.ci.adobe.com/api/v2/project/gh/Adobe-acom/Alert/pipeline" \
             --header "Circle-Token: ${{ secrets.CIRCLECI_TOKEN }}" \
             --header "content-type: application/json" \
             --data "$PARAMETERS")
