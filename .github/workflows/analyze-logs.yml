@@ -19,7 +19,7 @@ jobs:
           
           PARAMETERS=$(cat <<EOF
           {
-            "branch": "main",
+            "branch": "dev",
             "parameters": {
               "run_url": "${RUN_URL}"
             }
