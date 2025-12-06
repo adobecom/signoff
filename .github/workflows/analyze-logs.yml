@@ -10,8 +10,7 @@ on:
 
 jobs:
   trigger-circleci:
-    runs-on: [self-hosted, ubuntu]
-    
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Trigger CircleCI Pipeline
         run: |
