@@ -1,0 +1,65 @@
+name: Analyze Test Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_url:
+        description: 'GitHub Actions or CircleCI run URL to analyze'
+        required: true
+        type: string
+
+jobs:
+  trigger-circleci:
+    runs-on: [self-hosted, ubuntu]
+    
+    steps:
+      - name: Trigger CircleCI Pipeline
+        run: |
+          # Prepare parameters for CircleCI
+          RUN_URL="${{ inputs.run_url }}"
+          
+          PARAMETERS=$(cat <<EOF
+          {
+            "branch": "main",
+            "parameters": {
+              "run_url": "${RUN_URL}"
+            }
+          }
+          EOF
+          )
+          
+          echo "Triggering CircleCI pipeline to analyze logs from:"
+          echo "${RUN_URL}"
+          echo ""
+          echo "Parameters:"
+          echo "$PARAMETERS" | jq '.'
+          
+          # Trigger CircleCI pipeline
+          RESPONSE=$(curl -X POST \
+            --url "https://cci-ghec.ci.adobe.com/api/v2/project/gh/Adobe-acom/alert/pipeline" \
+            --header "Circle-Token: ${{ secrets.CIRCLECI_TOKEN }}" \
+            --header "content-type: application/json" \
+            --data "$PARAMETERS")
+          
+          echo ""
+          echo "CircleCI Response:"
+          echo "$RESPONSE" | jq '.'
+          
+          # Extract pipeline information
+          PIPELINE_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
+          PIPELINE_NUMBER=$(echo "$RESPONSE" | jq -r '.number // empty')
+          
+          if [ -z "$PIPELINE_ID" ]; then
+            echo "❌ Error: Failed to trigger CircleCI pipeline"
+            echo "$RESPONSE"
+            exit 1
+          fi
+          
+          # Construct CircleCI URL
+          CIRCLECI_URL="https://app.cci-ghec.ci.adobe.com/pipelines/github/Adobe-acom/alert/${PIPELINE_NUMBER}"
+          
+          echo ""
+          echo "✅ Successfully triggered CircleCI pipeline"
+          echo "Pipeline ID: ${PIPELINE_ID}"
+          echo "Pipeline Number: ${PIPELINE_NUMBER}"
+          echo "View CircleCI pipeline at: ${CIRCLECI_URL}"
