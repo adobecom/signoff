@@ -48,6 +48,7 @@ class PriceOption {
   constructor(option) {
     this.option = option
     this.price = option.locator('.subscription-panel-offer-price [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
+    this.priceInPromoHtml = option.locator('.subscription-panel-promo-html [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
   }  
 }
 
@@ -363,73 +364,135 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             }
             
             const priceOptions = await modal.priceOptions.all();
-            const priceOptionTexts = [];
-            for (let k = 0; k < priceOptions.length; k++) {
-              const priceOption = new PriceOption(priceOptions[k]);
-              const price = await priceOption.price.first({timeout: 10000});
-              priceOptionTexts.push(await price.textContent());
-            }
-            console.log(`   Available Options: ${priceOptionTexts.join(' | ')}`);
-            
-            for (let k = 0; k < priceOptions.length; k++) {
-              const priceOption = new PriceOption(priceOptions[k]);
-              const priceOptionText = priceOptionTexts[k];
+            const productOptionResults = [];
 
+            // Save the current price options in the modal.
+            // Check if the price options are the same when going back from the cart.
+            for (let k = 0; k < priceOptions.length; k++) {
               const optionResult = {
                 tabIndex: i,
                 tabTitle: tabTitle,
                 cardIndex: j,
                 cardTitle: productName,
                 optionIndex: k,
-                optionTitle: priceOptionText,
+                optionTitle: 'N/A',
+                error: []
               };
-              
-              await priceOption.price.first().click();
-              await page.waitForTimeout(1000);
-              await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
-              await modal.continueButton.first().click();
-              await page.waitForTimeout(5000);
+              productOptionResults.push(optionResult);
 
+              const priceOption = new PriceOption(priceOptions[k]);
+              try {
+                await priceOption.price.first().waitFor({ state: 'visible', timeout: 10000 });
+                const price = await priceOption.price.first();
+                const priceText = await price.textContent();
+                optionResult.optionTitle = priceText;
+              } catch (error) {
+                optionResult.error.push(`Price not found for ${tabTitle} > ${productName} > Option ${k + 1}`);
+                try {
+                  await priceOption.priceInPromoHtml.first().waitFor({ state: 'visible', timeout: 10000 });
+                  const priceInPromoHtml = await priceOption.priceInPromoHtml.first();
+                  const priceInPromoHtmlText = await priceInPromoHtml.textContent();
+                  optionResult.optionTitle = priceInPromoHtmlText;
+                  optionResult.error.push(`Price ${priceInPromoHtmlText} was found in the promo text instead of the price element`);
+                } catch (error) {
+                  // ignore
+                }
+              }
+            }
+            console.log(`   Available Options: ${productOptionResults.map(result => result.optionTitle).join(' | ')}`);
+            
+            for (let k = 0; k < priceOptions.length; k++) {
+
+              const optionResult = productOptionResults[k];
+              const priceOption = new PriceOption(priceOptions[k]);
+
+              let priceTextAgain;
+              try {
+                await priceOption.price.first().waitFor({ state: 'visible', timeout: 10000 });
+                const price = await priceOption.price.first();
+                priceTextAgain = await price.textContent();
+              } catch (error) {
+                try {
+                  await priceOption.priceInPromoHtml.first().waitFor({ state: 'visible', timeout: 10000 });
+                  const priceInPromoHtml = await priceOption.priceInPromoHtml.first();
+                  const priceInPromoHtmlText = await priceInPromoHtml.textContent();
+                  priceTextAgain = priceInPromoHtmlText;
+                } catch (error) {
+                  // ignore
+                }
+              }
+
+              if (priceTextAgain !== optionResult.optionTitle) {
+                const errorMessage = `Price changed after going back from the cart for ${tabTitle} > ${productName} > Option ${k + 1}`;
+                console.log(`❌ ${errorMessage}`);
+                optionResult.error.push(errorMessage);
+              }
+
+              const priceOptionText = priceTextAgain;
+
+              try {
+                await priceOption.option.click();
+                await page.waitForTimeout(1000);
+                await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
+                await modal.continueButton.first().click();
+              } catch (error) {
+                await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}-continue-error.png`});
+                const errorMessage = `${error.message} for ${tabTitle} > ${productName} > ${priceOptionText}`;
+                console.log(`❌ ${errorMessage}`);
+                optionResult.error.push(errorMessage);
+              }
+
+              await page.waitForTimeout(5000);
               await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png`});
 
-              const cartPage = new CartPage(page);
               try {
-                await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
-              } catch (error) {
-                console.log(`❌ Cart page load failed for "${productName}" option "${priceOptionText}" (Tab "${tabTitle}", Card ${j + 1}, Option ${k + 1}): Cart subtotal did not become visible within 20 seconds. The checkout may have failed. Original error: ${error.message}`);
-                throw new Error(`Cart subtotal not found for "${productName}" option "${priceOptionText}"`);
-              }
-              const cartSubTotal = await cartPage.cartSubTotal.first().textContent();
-              let cartTotal = 'N/A';
-              if (await cartPage.cartTotal.count() > 0) {
-                cartTotal = await cartPage.cartTotal.first().textContent();
-              }
-              let cartTotalNext = 'N/A';
-              if (await cartPage.cartTotalNext.count() > 0) {
-                cartTotalNext = await cartPage.cartTotalNext.first().textContent();
-              }
-              console.log(`\n   🛒 Testing Option: ${priceOptionText}`);
-              console.log(`      ├─ Cart Subtotal: ${cartSubTotal}`);
-              console.log(`      ├─ Cart Total: ${cartTotal}`);
-              console.log(`      └─ Next Billing: ${cartTotalNext}`);
-              
-              await page.screenshot({ path: `screenshots/teams-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
+                const cartPage = new CartPage(page);
+                try {
+                  await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
+                } catch (error) {
+                  throw new Error(`Cart subtotal not found`);
+                }
+                const cartSubTotal = await cartPage.cartSubTotal.first().textContent();
+                let cartTotal = 'N/A';
+                if (await cartPage.cartTotal.count() > 0) {
+                  cartTotal = await cartPage.cartTotal.first().textContent();
+                }
+                let cartTotalNext = 'N/A';
+                if (await cartPage.cartTotalNext.count() > 0) {
+                  cartTotalNext = await cartPage.cartTotalNext.first().textContent();
+                }
+                console.log(`\n   🛒 Testing Option: ${priceOptionText}`);
+                console.log(`      ├─ Cart Subtotal: ${cartSubTotal}`);
+                console.log(`      ├─ Cart Total: ${cartTotal}`);
+                console.log(`      └─ Next Billing: ${cartTotalNext}`);
+                
+                await page.screenshot({ path: `screenshots/teams-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
 
-              const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
-              if ((cartSubTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) && 
-                  (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) &&
-                  (cartTotalNext.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
-                optionResult.error = `Cart subtotal/total does not match option price ${priceOptionText} for tab \"${tabTitle}\" card \"${productName}\"`;
-                console.log(`\n      ✗ ERROR: ${optionResult.error}`);
+                const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
+                if ((cartSubTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) && 
+                    (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) &&
+                    (cartTotalNext.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
+                  optionResult.error.push(`Cart subtotal/total does not match for ${tabTitle} > ${productName} > ${priceOptionText}`);
+                  console.log(`\n      ✗ ERROR: ${optionResult.error}`);
+                } else {
+                  console.log(`      ✓ Price validation passed`);
+                }
+              } catch (error) {
+                await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}-price-error.png`});
+                const errorMessage = `${error.message} for ${tabTitle} > ${productName} > ${priceOptionText}`;
+                console.log(`❌ ${errorMessage}`);
+                optionResult.error.push(errorMessage);
+              } finally {
+                await page.goBack();
+                await page.waitForTimeout(1000);
+              }
+
+              if (optionResult.error.length > 0) {
+                optionResult.error = optionResult.error.join('\n');
                 cardHasOptionErrors = true;
               } else {
-                console.log(`      ✓ Price validation passed`);
+                delete optionResult.error;
               }
-
-              optionResults.push(optionResult);
-
-              await page.goBack();
-              await page.waitForTimeout(1000);
 
               if (newUrl === testUrl) {
                 await merchCard.checkoutLink.first().click();
@@ -437,18 +500,22 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 try {
                   await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
                 } catch (error) {
-                  console.log(`❌ Modal reload failed after returning from cart for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Price options did not reappear within 10 seconds. Original error: ${error.message}`);
-                  throw new Error(`Modal price options not found after cart return for "${productName}"`);
+                  const errorMessage = `Prices not found in the modal for ${tabTitle} > ${productName}`;
+                  console.log(`❌ ${errorMessage}`);
+                  throw new Error(errorMessage);
                 }
                 try {
                   await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
                 } catch (error) {
-                  console.log(`❌ Modal reload failed after returning from cart for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Continue button did not reappear within 10 seconds. Original error: ${error.message}`);
-                  throw new Error(`Modal continue button not found after cart return for "${productName}"`);
+                  const errorMessage = `Continue button not found in the modal for ${tabTitle} > ${productName}`;
+                  console.log(`❌ ${errorMessage}`);
+                  throw new Error(errorMessage);
                 }
               }
             }
             
+            optionResults.push(...productOptionResults);
+
             await plansPage.modalCloseButton.first().click();
           } else {
             console.log(`Redirected to URL ${newUrl}`);
@@ -465,7 +532,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               if (redirectedPageContent.includes(normalizedCardPrice)) {
                 console.log(`Card price found in redirected page content`);
               } else {
-                cardResult.error = `Card price ${cardPrice} not found in redirected page content for tab \"${tabTitle}\" card \"${productName}\"`;
+                cardResult.error = `Card price ${cardPrice} not found in the redirected page for ${tabTitle} > ${productName}`;
                 console.log(`✗ ${cardResult.error}`);
               }
             }
