@@ -53,14 +53,55 @@ class CartPage {
   }
 }
 
+// CSO-critical products (using partial matches to catch variations)
+const CSO_CRITICAL_PRODUCTS = [
+  'Creative Cloud Pro',      // Matches: Creative Cloud Pro (Individual, Student, Team)
+  'Acrobat Pro',             // Matches: Acrobat Pro (Individual and Team)
+  'Acrobat Studio',          // Matches: Acrobat Studio
+  'Photoshop',               // Matches: Photoshop standalone
+  'Photography'              // Matches: Photography plan (Lightroom + Photoshop)
+];
+
+// Helper function to check if product name matches CSO-critical products
+function isCSOCritical(productName) {
+  return CSO_CRITICAL_PRODUCTS.some(critical => 
+    productName.includes(critical)
+  );
+}
+
+// Helper function to check if error is CSO-critical
+function isCSOCriticalError(errorMessage, productName) {
+  const csoErrorTypes = [
+    'does not match card price',      // Pricing mismatch
+    'does not match option price',    // Cart total mismatch
+    'Modal iframe not found',         // Modal not loading
+    'Modal price options not found',  // Modal not loading properly
+    'No price displayed'              // No price displayed
+  ];
+  
+  return isCSOCritical(productName) && 
+         csoErrorTypes.some(errorType => errorMessage.includes(errorType));
+}
+
 // Helper function to save error information for notifications
-function saveErrorReport(testName, errors, testUrl) {
+function saveErrorReport(testName, errors, errorResults, testUrl) {
+  // Check for CSO-critical errors
+  const csoErrors = errorResults.filter(result => 
+    isCSOCriticalError(result.error, result.cardTitle || '')
+  );
+  
   const errorReport = {
     timestamp: new Date().toISOString(),
     testName: testName,
     testUrl: testUrl,
     errorCount: errors.length,
     errors: errors,
+    hasCSOCriticalErrors: csoErrors.length > 0,
+    csoErrorCount: csoErrors.length,
+    csoErrors: csoErrors.map(r => ({
+      product: r.cardTitle,
+      error: r.error
+    })),
     status: 'FAILED'
   };
 
@@ -75,6 +116,9 @@ function saveErrorReport(testName, errors, testUrl) {
   fs.writeFileSync(reportPath, JSON.stringify(errorReport, null, 2));
   
   console.log(`\n📝 Error report saved to: ${reportPath}`);
+  if (csoErrors.length > 0) {
+    console.log(`⚠️  CSO-CRITICAL ERRORS DETECTED: ${csoErrors.length} error(s) in critical products`);
+  }
   return reportPath;
 }
 
@@ -186,6 +230,12 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           cardResult.cardTitle = productName;
           cardResult.cardPrice = cardPrice;
+          
+          // Flag CSO-critical products with no price
+          if (cardPrice === 'N/A' && isCSOCritical(productName)) {
+            cardResult.error = `No price displayed for "${productName}" (Tab "${tabTitle}", Card ${j + 1})`;
+            console.log(`  │  │  ⚠️  CSO-CRITICAL: No price displayed`);
+          }
 
           await merchCard.card.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}.png`});
 
@@ -424,7 +474,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       
       // Save error report for notifications with detailed error information
       const errorMessages = errorResults.map(r => r.error);
-      saveErrorReport('Price Errors', errorMessages, testUrl);
+      saveErrorReport('Price Errors', errorMessages, errorResults, testUrl);
       
       expect(errorResults.length).toBe(0);
     } else {
