@@ -70,9 +70,14 @@ jobs:
             apt-get update && apt-get install -y jq
           fi
           
+          # Define CSO-critical products (US uses English)
+          CSO_PRODUCTS="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Photography|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          echo "Using CSO products list for US: $CSO_PRODUCTS"
+          
           ERROR_SUMMARY=""
-          CSO_WARNING=""
-          HAS_CSO_ERRORS=false
+          CSO_AFFECTED_PRODUCTS=""
+          HAS_CSO_FAILURE="false"
           
           if [ -d "test-results" ] && [ -n "$(ls -A test-results/error-report-*.json 2>/dev/null)" ]; then
             echo "Found error report files"
@@ -83,28 +88,31 @@ jobs:
                 ERROR_COUNT=$(jq -r '.errorCount' "$file")
                 ERRORS=$(jq -r '.errors | join("\n• ")' "$file")
                 
-                # Check for CSO-critical errors
-                HAS_CSO=$(jq -r '.hasCSOCriticalErrors // false' "$file")
-                CSO_COUNT=$(jq -r '.csoErrorCount // 0' "$file")
-                
-                if [ "$HAS_CSO" = "true" ] && [ "$CSO_COUNT" -gt 0 ]; then
-                  HAS_CSO_ERRORS=true
-                  CSO_WARNING="
-          
-          🚨 **CSO ALERT** 🚨
-          **${CSO_COUNT} CSO-critical error(s) detected in core products!**
-          **Please look - this is likely a CSO issue**
-          
-          Affected products:
-          $(jq -r '.csoErrors[] | "• \(.product): \(.error)"' "$file")
-          "
-                fi
-                
                 ERROR_SUMMARY="${ERROR_SUMMARY}
           
           **${TEST_NAME}** (${ERROR_COUNT} error(s)):
           • ${ERRORS}
           "
+                
+                # Check if any errors mention CSO-critical products
+                for error in $(jq -r '.errors[]' "$file"); do
+                  # Extract product names from error messages (format: "... for TabName > ProductName > ...")
+                  if echo "$error" | grep -q " > "; then
+                    PRODUCT=$(echo "$error" | sed -n 's/.*> \([^>]*\) >.*/\1/p')
+                    if [ -n "$PRODUCT" ]; then
+                      # Check if product matches any CSO-critical product
+                      if echo "$PRODUCT" | grep -qE "($CSO_PRODUCTS)"; then
+                        echo "⚠️  CSO-CRITICAL PRODUCT FAILURE DETECTED: $PRODUCT"
+                        HAS_CSO_FAILURE="true"
+                        if [ -z "$CSO_AFFECTED_PRODUCTS" ]; then
+                          CSO_AFFECTED_PRODUCTS="$PRODUCT"
+                        elif ! echo "$CSO_AFFECTED_PRODUCTS" | grep -q "$PRODUCT"; then
+                          CSO_AFFECTED_PRODUCTS="${CSO_AFFECTED_PRODUCTS}, ${PRODUCT}"
+                        fi
+                      fi
+                    fi
+                  fi
+                done
               fi
             done
           else
@@ -116,11 +124,12 @@ jobs:
           echo "$ERROR_SUMMARY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
-          echo "CSO_WARNING<<EOF" >> $GITHUB_OUTPUT
-          echo "$CSO_WARNING" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "HAS_CSO_FAILURE=$HAS_CSO_FAILURE" >> $GITHUB_OUTPUT
+          echo "CSO_AFFECTED_PRODUCTS=$CSO_AFFECTED_PRODUCTS" >> $GITHUB_OUTPUT
           
-          echo "HAS_CSO_ERRORS=$HAS_CSO_ERRORS" >> $GITHUB_OUTPUT
+          if [ "$HAS_CSO_FAILURE" = "true" ]; then
+            echo "🚨 CSO ALERT: Critical products affected: $CSO_AFFECTED_PRODUCTS"
+          fi
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -132,6 +141,34 @@ jobs:
             screenshots/
             test-results/
           retention-days: 30
+
+      - name: 🚨 CSO ALERT - Critical Product Failure (US)
+        if: failure() && steps.process-errors.outputs.HAS_CSO_FAILURE == 'true'
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: 'acom-commerce-alerts'
+          SLACK_COLOR: '#FF0000'
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: 🚨 CSO Alert - Plans US Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: |
+            🚨 **POTENTIAL CSO DETECTED** 🚨
+            
+            Critical product failure(s) detected that may indicate a Customer Service Outage.
+            
+            **Affected Critical Products:**
+            ${{ steps.process-errors.outputs.CSO_AFFECTED_PRODUCTS }}
+            
+            **Region:** United States 🇺🇸
+            **Test URL:** https://www.adobe.com/creativecloud/plans.html
+            
+            **Action Required:** Immediate investigation recommended
+            
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TITLE: '🚨 POTENTIAL CSO - Critical Product Failure Detected (US)'
+          SLACK_FOOTER: "Priority: HIGH | Requires immediate attention"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
       - name: Slack notification on success
         if: success()
@@ -162,11 +199,12 @@ jobs:
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             Test URL: https://www.adobe.com/creativecloud/plans.html
-            ${{ steps.process-errors.outputs.CSO_WARNING }}
+            ${{ steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && '🚨 **CSO Alert**: Critical products affected - see separate CSO alert above' || '' }}
+            
             ${{ steps.process-errors.outputs.ERROR_SUMMARY }}
             
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Plans US Monitor 🇺🇸 - FAILURE
+          SLACK_TITLE: ❌ Plans US Monitor 🇺🇸 - FAILURE${{ steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && ' 🚨 [CSO]' || '' }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
