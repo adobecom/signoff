@@ -55,11 +55,20 @@ class CartPage {
 
 // CSO-critical products (using partial matches to catch variations)
 const CSO_CRITICAL_PRODUCTS = [
-  'Creative Cloud Pro',      // Matches: Creative Cloud Pro (Individual, Student, Team)
-  'Acrobat Pro',             // Matches: Acrobat Pro (Individual and Team)
-  'Acrobat Studio',          // Matches: Acrobat Studio
-  'Photoshop',               // Matches: Photoshop standalone
-  'Photography'              // Matches: Photography plan (Lightroom + Photoshop)
+  'Creative Cloud Pro',
+  'Acrobat Pro',
+  'Acrobat Studio',
+  'Photoshop',
+  'Photography',
+  'Adobe Premiere',
+  'Adobe Firefly Pro',
+  'Illustrator',
+  'Lightroom',
+  'After Effects',
+  'Express',
+  'Adobe Stock',
+  'Adobe Express Premium',
+  'Acrobat Standard',
 ];
 
 // Helper function to check if product name matches CSO-critical products
