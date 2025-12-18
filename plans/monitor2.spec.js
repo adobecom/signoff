@@ -371,9 +371,15 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               console.log(`  │  │       → Option ${k + 1}/${priceOptions.length}: ${priceOptionTexts[k]}`);
               console.log(`  │  │          Cart total: ${cartTotal}`);
 
-              if (cartTotal.replace(/[^\d.]/g, '') !== priceOptionTexts[k].replace(/[^\d.]/g, '')) {
-                optionResult.error = `Cart total ${cartTotal} does not match option price ${priceOptionTexts[k]} for tab \"${tabTitle}\" card \"${productName}\"`;
-                console.log(`  │  │          ✗ ERROR: Price mismatch`);
+              const digitOnlyCardPrice = priceOptionTexts[k].replace(/[^\d.]/g, '');
+              const digitOnlyCartTotal = cartTotal.replace(/[^\d.]/g, '');
+              
+              if (digitOnlyCartTotal !== digitOnlyCardPrice) {
+                // Determine direction: card_lower means card price < cart price (worse for customer)
+                const priceDirection = parseFloat(digitOnlyCardPrice) < parseFloat(digitOnlyCartTotal) ? '[CARD_LOWER]' : '[CARD_HIGHER]';
+                
+                optionResult.error = `${priceDirection} Cart total does not match option price for ${tabTitle} > ${productName} > Card: ${priceOptionTexts[k]}, Cart: ${cartTotal}`;
+                console.log(`  │  │          ✗ ERROR: Price mismatch ${priceDirection}`);
                 cardHasOptionErrors = true;
               } else {
                 console.log(`  │  │          ✓ Price matches`);
