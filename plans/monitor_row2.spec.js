@@ -469,10 +469,21 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 await page.screenshot({ path: `screenshots/teams-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
 
                 const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
-                if ((cartSubTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) && 
-                    (cartTotal.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice) &&
-                    (cartTotalNext.split('/')[0].replace(/[^\d]/g, '') !== digitOnlyPrice)) {
-                  optionResult.error.push(`Cart subtotal/total does not match for ${tabTitle} > ${productName} > ${priceOptionText}`);
+                const digitOnlySubTotal = cartSubTotal.split('/')[0].replace(/[^\d]/g, '');
+                const digitOnlyTotal = cartTotal.split('/')[0].replace(/[^\d]/g, '');
+                const digitOnlyTotalNext = cartTotalNext.split('/')[0].replace(/[^\d]/g, '');
+                
+                if ((digitOnlySubTotal !== digitOnlyPrice) && 
+                    (digitOnlyTotal !== digitOnlyPrice) &&
+                    (digitOnlyTotalNext !== digitOnlyPrice)) {
+                  // Determine which cart price to compare (prefer subtotal, then total, then next)
+                  let cartPriceToCompare = digitOnlySubTotal !== '' ? digitOnlySubTotal : (digitOnlyTotal !== '' ? digitOnlyTotal : digitOnlyTotalNext);
+                  let cartPriceDisplay = digitOnlySubTotal !== '' ? cartSubTotal : (digitOnlyTotal !== '' ? cartTotal : cartTotalNext);
+                  
+                  // Determine direction: card_lower means card price < cart price (worse for customer)
+                  const priceDirection = parseInt(digitOnlyPrice) < parseInt(cartPriceToCompare) ? '[CARD_LOWER]' : '[CARD_HIGHER]';
+                  
+                  optionResult.error.push(`${priceDirection} Cart subtotal/total does not match for ${tabTitle} > ${productName} > Card: ${priceOptionText}, Cart: ${cartPriceDisplay}`);
                   console.log(`\n      ✗ ERROR: ${optionResult.error}`);
                 } else {
                   console.log(`      ✓ Price validation passed`);

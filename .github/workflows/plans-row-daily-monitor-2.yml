@@ -491,19 +491,51 @@ jobs:
                 
                 # Check if any errors mention CSO-critical products
                 for error in $(jq -r '.errors[]' "$file"); do
-                  # Extract product names from error messages (format: "... for TabName > ProductName > ...")
+                  PRODUCT=""
+                  IS_CSO_ERROR=false
+                  
+                  # Extract product name from error message (format: "... for TabName > ProductName > ...")
                   if echo "$error" | grep -q " > "; then
                     PRODUCT=$(echo "$error" | sed -n 's/.*> \([^>]*\) >.*/\1/p')
-                    if [ -n "$PRODUCT" ]; then
-                      # Check if product matches any CSO-critical product
-                      if echo "$PRODUCT" | grep -qE "($CSO_PRODUCTS)"; then
-                        echo "⚠️  CSO-CRITICAL PRODUCT FAILURE DETECTED: $PRODUCT"
-                        HAS_CSO_FAILURE="true"
-                        if [ -z "$CSO_AFFECTED_PRODUCTS" ]; then
-                          CSO_AFFECTED_PRODUCTS="$PRODUCT"
-                        elif ! echo "$CSO_AFFECTED_PRODUCTS" | grep -q "$PRODUCT"; then
-                          CSO_AFFECTED_PRODUCTS="${CSO_AFFECTED_PRODUCTS}, ${PRODUCT}"
-                        fi
+                  # Extract product name from modal/price errors (format: 'for "ProductName"')
+                  elif echo "$error" | grep -q 'for "'; then
+                    PRODUCT=$(echo "$error" | sed -n 's/.*for "\([^"]*\)".*/\1/p')
+                  fi
+                  
+                  # Skip if no product found
+                  [ -z "$PRODUCT" ] && continue
+                  
+                  # Check if product matches any CSO-critical product
+                  if echo "$PRODUCT" | grep -qE "($CSO_PRODUCTS)"; then
+                    # Check for CSO-triggering errors:
+                    # 1. CARD_LOWER - card price < cart price (bait & switch)
+                    if echo "$error" | grep -q "\[CARD_LOWER\]"; then
+                      echo "⚠️  CSO-CRITICAL: $PRODUCT - CARD_LOWER (price increase at checkout)"
+                      IS_CSO_ERROR=true
+                    
+                    # 2. Missing prices - completely blocks purchase
+                    elif echo "$error" | grep -qE "(Price not found|Modal price options not found|price options did not become visible)"; then
+                      echo "⚠️  CSO-CRITICAL: $PRODUCT - MISSING PRICE (purchase blocked)"
+                      IS_CSO_ERROR=true
+                    
+                    # 3. Modal failures - prevents checkout flow
+                    elif echo "$error" | grep -qE "(Modal not found|Continue button not found|modal|continue button did not)"; then
+                      echo "⚠️  CSO-CRITICAL: $PRODUCT - MODAL FAILURE (checkout blocked)"
+                      IS_CSO_ERROR=true
+                    
+                    # 4. Cart failures - prevents price verification/purchase
+                    elif echo "$error" | grep -qE "(Cart total not found|Cart subtotal not found|cart.*not found)"; then
+                      echo "⚠️  CSO-CRITICAL: $PRODUCT - CART FAILURE (purchase blocked)"
+                      IS_CSO_ERROR=true
+                    fi
+                    
+                    # Add to CSO affected products list
+                    if [ "$IS_CSO_ERROR" = true ]; then
+                      HAS_CSO_FAILURE="true"
+                      if [ -z "$CSO_AFFECTED_PRODUCTS" ]; then
+                        CSO_AFFECTED_PRODUCTS="$PRODUCT"
+                      elif ! echo "$CSO_AFFECTED_PRODUCTS" | grep -q "$PRODUCT"; then
+                        CSO_AFFECTED_PRODUCTS="${CSO_AFFECTED_PRODUCTS}, ${PRODUCT}"
                       fi
                     fi
                   fi
@@ -551,6 +583,12 @@ jobs:
             🚨 **POTENTIAL CSO DETECTED** 🚨
             
             Critical product failure(s) detected that may indicate a Customer Service Outage.
+            
+            **Possible Issues:**
+            • Card price LOWER than cart (price increase at checkout)
+            • Missing prices (purchase completely blocked)
+            • Modal/checkout failures (can't proceed to cart)
+            • Cart loading failures (can't complete purchase)
             
             **Affected Critical Products:**
             ${{ steps.process-errors.outputs.CSO_AFFECTED_PRODUCTS }}
