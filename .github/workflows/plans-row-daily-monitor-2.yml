@@ -447,8 +447,28 @@ jobs:
             apt-get update && apt-get install -y jq
           fi
           
-          # Define CSO-critical products
-          CSO_PRODUCTS="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Photography|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          # Define CSO-critical products (English)
+          CSO_PRODUCTS_EN="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Photography|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Define CSO-critical products (German)
+          CSO_PRODUCTS_DE="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Foto-Abo|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Define CSO-critical products (French)
+          CSO_PRODUCTS_FR="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Photographie|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Define CSO-critical products (Japanese)
+          CSO_PRODUCTS_JP="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|フォトプラン|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Select product list based on locale
+          LOCALE="${{ matrix.locale }}"
+          case "$LOCALE" in
+            de) CSO_PRODUCTS="$CSO_PRODUCTS_DE" ;;
+            fr) CSO_PRODUCTS="$CSO_PRODUCTS_FR" ;;
+            jp) CSO_PRODUCTS="$CSO_PRODUCTS_JP" ;;
+            *) CSO_PRODUCTS="$CSO_PRODUCTS_EN" ;;
+          esac
+          
+          echo "Using CSO products list for locale '$LOCALE': $CSO_PRODUCTS"
           
           ERROR_SUMMARY=""
           CSO_AFFECTED_PRODUCTS=""
