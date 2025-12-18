@@ -447,7 +447,33 @@ jobs:
             apt-get update && apt-get install -y jq
           fi
           
+          # Define CSO-critical products (English)
+          CSO_PRODUCTS_EN="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Photography|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Define CSO-critical products (German)
+          CSO_PRODUCTS_DE="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Foto-Abo|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Define CSO-critical products (French)
+          CSO_PRODUCTS_FR="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|Photographie|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Define CSO-critical products (Japanese)
+          CSO_PRODUCTS_JP="Creative Cloud Pro|Acrobat Pro|Acrobat Studio|Photoshop|フォトプラン|Adobe Premiere|Adobe Firefly Pro|Illustrator|Lightroom|After Effects|Express|Adobe Stock|Adobe Express Premium|Acrobat Standard"
+          
+          # Select product list based on locale
+          LOCALE="${{ matrix.locale }}"
+          case "$LOCALE" in
+            de) CSO_PRODUCTS="$CSO_PRODUCTS_DE" ;;
+            fr) CSO_PRODUCTS="$CSO_PRODUCTS_FR" ;;
+            jp) CSO_PRODUCTS="$CSO_PRODUCTS_JP" ;;
+            *) CSO_PRODUCTS="$CSO_PRODUCTS_EN" ;;
+          esac
+          
+          echo "Using CSO products list for locale '$LOCALE': $CSO_PRODUCTS"
+          
           ERROR_SUMMARY=""
+          CSO_AFFECTED_PRODUCTS=""
+          HAS_CSO_FAILURE="false"
+          
           if [ -d "test-results" ] && [ -n "$(ls -A test-results/error-report-*.json 2>/dev/null)" ]; then
             echo "Found error report files"
             for file in test-results/error-report-*.json; do
@@ -462,6 +488,26 @@ jobs:
           **${TEST_NAME}** (${ERROR_COUNT} error(s)):
           • ${ERRORS}
           "
+                
+                # Check if any errors mention CSO-critical products
+                for error in $(jq -r '.errors[]' "$file"); do
+                  # Extract product names from error messages (format: "... for TabName > ProductName > ...")
+                  if echo "$error" | grep -q " > "; then
+                    PRODUCT=$(echo "$error" | sed -n 's/.*> \([^>]*\) >.*/\1/p')
+                    if [ -n "$PRODUCT" ]; then
+                      # Check if product matches any CSO-critical product
+                      if echo "$PRODUCT" | grep -qE "($CSO_PRODUCTS)"; then
+                        echo "⚠️  CSO-CRITICAL PRODUCT FAILURE DETECTED: $PRODUCT"
+                        HAS_CSO_FAILURE="true"
+                        if [ -z "$CSO_AFFECTED_PRODUCTS" ]; then
+                          CSO_AFFECTED_PRODUCTS="$PRODUCT"
+                        elif ! echo "$CSO_AFFECTED_PRODUCTS" | grep -q "$PRODUCT"; then
+                          CSO_AFFECTED_PRODUCTS="${CSO_AFFECTED_PRODUCTS}, ${PRODUCT}"
+                        fi
+                      fi
+                    fi
+                  fi
+                done
               fi
             done
           else
@@ -472,6 +518,13 @@ jobs:
           echo "ERROR_SUMMARY<<EOF" >> $GITHUB_OUTPUT
           echo "$ERROR_SUMMARY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "HAS_CSO_FAILURE=$HAS_CSO_FAILURE" >> $GITHUB_OUTPUT
+          echo "CSO_AFFECTED_PRODUCTS=$CSO_AFFECTED_PRODUCTS" >> $GITHUB_OUTPUT
+          
+          if [ "$HAS_CSO_FAILURE" = "true" ]; then
+            echo "🚨 CSO ALERT: Critical products affected: $CSO_AFFECTED_PRODUCTS"
+          fi
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -483,6 +536,34 @@ jobs:
             screenshots/
             test-results/
           retention-days: 30
+
+      - name: 🚨 CSO ALERT - Critical Product Failure
+        if: failure() && steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && contains(fromJson('["uk","de","fr","jp"]'), matrix.locale)
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: 'acom-commerce-alerts'
+          SLACK_COLOR: '#FF0000'
+          SLACK_ICON: https://github.com/actions.png?size=48
+          SLACK_USERNAME: 🚨 CSO Alert - Plans ROW Monitor
+          SLACK_MSG_AUTHOR: ""
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: |
+            🚨 **POTENTIAL CSO DETECTED** 🚨
+            
+            Critical product failure(s) detected that may indicate a Customer Service Outage.
+            
+            **Affected Critical Products:**
+            ${{ steps.process-errors.outputs.CSO_AFFECTED_PRODUCTS }}
+            
+            **Locale:** ${{ matrix.locale }}
+            **Test URL:** ${{ env.TEST_URL }}
+            
+            **Action Required:** Immediate investigation recommended
+            
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TITLE: '🚨 POTENTIAL CSO - Critical Product Failure Detected'
+          SLACK_FOOTER: "Priority: HIGH | Requires immediate attention"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
       - name: Check if locale is in faulty mode
         id: check-faulty
@@ -511,11 +592,12 @@ jobs:
           SLACK_MESSAGE: |
             Test URL: ${{ env.TEST_URL }}
             ${{ steps.check-faulty.outputs.is_faulty == 'true' && '⚠️  Running in FAULTY MODE (1x per day - 6am local) - Known issue, reduced alerting' || '' }}
+            ${{ steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && '🚨 **CSO Alert**: Critical products affected - see separate CSO alert above' || '' }}
             
             ${{ steps.process-errors.outputs.ERROR_SUMMARY }}
             
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Plans ROW Monitor (${{ matrix.locale }}) - FAILURE${{ steps.check-faulty.outputs.is_faulty == 'true' && ' [Known Faulty]' || '' }}
+          SLACK_TITLE: ❌ Plans ROW Monitor (${{ matrix.locale }}) - FAILURE${{ steps.check-faulty.outputs.is_faulty == 'true' && ' [Known Faulty]' || '' }}${{ steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && ' 🚨 [CSO]' || '' }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
