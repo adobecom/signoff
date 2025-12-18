@@ -71,6 +71,9 @@ jobs:
           fi
           
           ERROR_SUMMARY=""
+          CSO_WARNING=""
+          HAS_CSO_ERRORS=false
+          
           if [ -d "test-results" ] && [ -n "$(ls -A test-results/error-report-*.json 2>/dev/null)" ]; then
             echo "Found error report files"
             for file in test-results/error-report-*.json; do
@@ -79,6 +82,23 @@ jobs:
                 TEST_NAME=$(jq -r '.testName' "$file")
                 ERROR_COUNT=$(jq -r '.errorCount' "$file")
                 ERRORS=$(jq -r '.errors | join("\n• ")' "$file")
+                
+                # Check for CSO-critical errors
+                HAS_CSO=$(jq -r '.hasCSOCriticalErrors // false' "$file")
+                CSO_COUNT=$(jq -r '.csoErrorCount // 0' "$file")
+                
+                if [ "$HAS_CSO" = "true" ] && [ "$CSO_COUNT" -gt 0 ]; then
+                  HAS_CSO_ERRORS=true
+                  CSO_WARNING="
+          
+          🚨 **CSO ALERT** 🚨
+          **${CSO_COUNT} CSO-critical error(s) detected in core products!**
+          **Please look - this is likely a CSO issue**
+          
+          Affected products:
+          $(jq -r '.csoErrors[] | "• \(.product): \(.error)"' "$file")
+          "
+                fi
                 
                 ERROR_SUMMARY="${ERROR_SUMMARY}
           
@@ -95,6 +115,12 @@ jobs:
           echo "ERROR_SUMMARY<<EOF" >> $GITHUB_OUTPUT
           echo "$ERROR_SUMMARY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "CSO_WARNING<<EOF" >> $GITHUB_OUTPUT
+          echo "$CSO_WARNING" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "HAS_CSO_ERRORS=$HAS_CSO_ERRORS" >> $GITHUB_OUTPUT
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -136,7 +162,7 @@ jobs:
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             Test URL: https://www.adobe.com/creativecloud/plans.html
-            
+            ${{ steps.process-errors.outputs.CSO_WARNING }}
             ${{ steps.process-errors.outputs.ERROR_SUMMARY }}
             
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
