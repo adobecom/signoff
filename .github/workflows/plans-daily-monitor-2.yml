@@ -18,6 +18,7 @@ on:
         description: 'Test URL'
         required: false
         type: string
+        default: 'https://www.adobe.com/creativecloud/plans.html?martech=off'
       slack_channel_passed:
         description: 'Slack channel for passed tests'
         required: false

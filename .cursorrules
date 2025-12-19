@@ -9,6 +9,50 @@ Locales follow the pattern: `/{locale}/` or `/{country}_{language}/`
 - Base URL structure: `https://www.adobe.com/{locale}/creativecloud/plans.html`
 - US locale has no prefix: `https://www.adobe.com/creativecloud/plans.html`
 
+## Locale Tiers (Priority)
+
+Locales are grouped into tiers based on priority for testing and monitoring:
+
+### T1 - Tier 1 (5 locales)
+High priority markets for immediate testing and monitoring:
+- `` (us) - United States
+- `de` - Germany
+- `uk` - United Kingdom
+- `fr` - France
+- `jp` - Japan
+
+### T2 - Tier 2 (7 locales)
+Secondary priority markets:
+- `dk` - Denmark
+- `es` - Spain
+- `fi` - Finland
+- `it` - Italy
+- `nl` - Netherlands
+- `no` - Norway
+- `se` - Sweden
+
+### T3 - Tier 3 (8 locales)
+Third priority markets:
+- `ca` - Canada (English)
+- `mx` - Mexico
+- `la` - Latin America
+- `kr` - Korea
+- `br` - Brazil
+- `hk_zh` - Hong Kong (Chinese)
+- `tw` - Taiwan
+- `cn` - China
+
+### T4 - Tier 4 (69 locales)
+All remaining supported locales:
+- `eg_ar`, `kw_ar`, `mena_ar`, `qa_ar`, `sa_ar`, `bg`, `cz`, `at`, `ch_de`, `lu_de`
+- `gr_el`, `in`, `id_en`, `my_en`, `ph_en`, `th_en`, `za`, `africa`, `gr_en`, `hk_en`
+- `ng`, `vn_en`, `au`, `nz`, `be_en`, `cis_en`, `eg_en`, `ie`, `il_en`, `kw_en`, `lu_en`
+- `mena_en`, `qa_en`, `sa_en`, `sg`, `ae_en`, `co`, `pe`, `cl`, `cr`, `ec`, `gt`, `ar`, `pr`, `ee`
+- `ph_fil`, `ca_fr`, `ch_fr`, `be_fr`, `lu_fr`, `il_he`, `in_hi`, `hu`, `id_id`, `ch_it`
+- `lv`, `my_ms`, `be_nl`, `pl`, `pt`, `ro`, `cis_ru`, `sk`, `si`, `th_th`, `tr`, `ua`, `vn_vi`
+
+**Note:** Some T4 locales listed above (like `cis_en`, `cis_ru`) may have special considerations or regional variations.
+
 ## Supported Locales by Region
 
 ### Americas (LATAM)
@@ -122,6 +166,30 @@ const SUPPORTED_LOCALES = [
 ];
 ```
 
+### Locale Tiers
+```javascript
+const LOCALE_TIERS = {
+  T1: ['', 'de', 'uk', 'fr', 'jp'],
+  T2: ['dk', 'es', 'fi', 'it', 'nl', 'no', 'se'],
+  T3: ['ca', 'mx', 'la', 'kr', 'br', 'hk_zh', 'tw', 'cn'],
+  T4: [
+    'eg_ar', 'kw_ar', 'mena_ar', 'qa_ar', 'sa_ar', 'bg', 'cz', 'at', 'ch_de', 'lu_de',
+    'gr_el', 'in', 'id_en', 'my_en', 'ph_en', 'th_en', 'za', 'africa', 'gr_en', 'hk_en',
+    'ng', 'vn_en', 'au', 'nz', 'be_en', 'cis_en', 'eg_en', 'ie', 'il_en', 'kw_en', 'lu_en',
+    'mena_en', 'qa_en', 'sa_en', 'sg', 'ae_en', 'co', 'pe', 'cl', 'cr', 'ec', 'gt', 'ar', 'pr', 'ee',
+    'ph_fil', 'ca_fr', 'ch_fr', 'be_fr', 'lu_fr', 'il_he', 'in_hi', 'hu', 'id_id', 'ch_it',
+    'lv', 'my_ms', 'be_nl', 'pl', 'pt', 'ro', 'cis_ru', 'sk', 'si', 'th_th', 'tr', 'ua', 'vn_vi'
+  ]
+};
+
+// Get all locales for a specific tier or multiple tiers
+function getLocalesByTier(tiers = ['T1']) {
+  return tiers.flatMap(tier => LOCALE_TIERS[tier] || []);
+}
+
+// Example: getLocalesByTier(['T1', 'T2']) => ['', 'de', 'uk', 'fr', 'jp', 'dk', 'es', ...]
+```
+
 ### Building URLs
 ```javascript
 function buildPlansUrl(locale, page = 'plans') {
@@ -136,14 +204,19 @@ function buildPlansUrl(locale, page = 'plans') {
 
 ### Test Configuration
 When writing tests or monitors for multiple locales:
+- **Prioritize by tier:** Test T1 first, then T2, T3, and finally T4
 - Group by region for parallel execution
 - Consider timezone differences for scheduling
 - Account for different pricing/currency displays
 - Test both left-to-right (LTR) and right-to-left (RTL) languages (Arabic locales)
+- For smoke tests, focus on T1 locales only
+- For comprehensive testing, include T1-T3; T4 can be run less frequently
 
 ## Notes
-- Total: 92 supported locales
+- Total: 92 supported locales (90 with prefixes + 2 special cases)
+- **Locale Tiers:** T1 (5), T2 (7), T3 (8), T4 (69)
 - RTL languages: Arabic variants (eg_ar, kw_ar, qa_ar, sa_ar, ae_ar, mena_ar) and Hebrew (il_he)
 - Multi-language countries: Belgium (3), Luxembourg (3), Switzerland (3), Egypt (2), Greece (2), etc.
 - Empty string ('') represents US locale (no prefix in URL)
+- Priority testing should focus on T1 first, then T2, T3, and finally T4
 
