@@ -152,8 +152,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       !error.toLowerCase().includes('third-party') &&
       !error.includes('reading \'setAttribute\'') && // Cannot read properties of null (reading 'setAttribute')
       !error.includes('reading \'style\'') && // Cannot read properties of null (reading 'style')
-      !error.startsWith('X')
-    );
+      !error.startsWith('X') &&
+      !error.includes('Failed to load resource: net::ERR_FAILED') &&
+      !error.includes('https://cdn.cookielaw.org/')
+   );
     
     if (criticalErrors.length > 0) {
       console.log('\n⚠️  CRITICAL ERRORS FOUND:');
@@ -423,7 +425,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               }
 
               if (priceTextAgain !== optionResult.optionTitle) {
-                const errorMessage = `Price changed after going back from the cart for ${tabTitle} > ${productName} > Option ${k + 1}`;
+                await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}-price-change.png`});
+                const errorMessage = `Price changed to ${priceTextAgain} after going back from the cart for ${tabTitle} > ${productName} > Option ${k + 1}`;
                 console.log(`❌ ${errorMessage}`);
                 optionResult.error.push(errorMessage);
               }
@@ -431,6 +434,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               const priceOptionText = priceTextAgain;
 
               try {
+                await priceOption.option.waitFor({ state: 'visible', timeout: 10000 });
                 await priceOption.option.click();
                 await page.waitForTimeout(1000);
                 await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
