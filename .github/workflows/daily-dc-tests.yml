@@ -93,34 +93,74 @@ jobs:
           timeout-minutes: 45
           script: |
             const dispatchResult = '${{ steps.dispatch.outputs.result }}' || '';
-            const dispatchTime = dispatchResult ? parseInt(dispatchResult) : (Date.now() - 60000); // Fallback to 1 minute ago if empty
+            const dispatchTime = dispatchResult ? parseInt(dispatchResult) : (Date.now() - 60000);
+            // Add buffer to account for API delays and clock skew
+            const searchStartTime = dispatchTime - 10000; // 10 seconds before dispatch
             console.log(`Dispatch result: '${dispatchResult}'`)
             console.log(`Using dispatch time: ${dispatchTime}`)
+            console.log(`Search start time (with buffer): ${searchStartTime}`)
             
             const maxWaitTime = 45 * 60 * 1000 // 45 minutes
             const pollInterval = 30 * 1000 // 30 seconds
             
             let workflowRun = null
+            let trackedRunId = null  // Track the run ID once found
             let elapsedTime = 0
             
             while (elapsedTime < maxWaitTime) {
-              // Get recent workflow runs
+              // Get recent workflow runs with more results
               const runs = await github.rest.actions.listWorkflowRuns({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: 'pageload.yml',
-                per_page: 10
+                per_page: 20,  // Increased from 10
+                event: 'workflow_dispatch'  // Filter by event type
               })
               
-              // Find the run we just dispatched
-              const recentRun = runs.data.workflow_runs.find(run => 
-                new Date(run.created_at).getTime() >= dispatchTime &&
-                run.event === 'workflow_dispatch'
-              )
+              console.log(`Found ${runs.data.workflow_runs.length} workflow_dispatch runs`)
               
-              if (recentRun && recentRun.status === 'completed') {
-                workflowRun = recentRun
-                break
+              // If we haven't found our run yet, look for it
+              if (!trackedRunId) {
+                const recentRun = runs.data.workflow_runs.find(run => {
+                  const runTime = new Date(run.created_at).getTime()
+                  const isRecent = runTime >= searchStartTime
+                  console.log(`Checking run ${run.id}: created_at=${run.created_at} (${runTime}), isRecent=${isRecent}, status=${run.status}`)
+                  return isRecent
+                })
+                
+                if (recentRun) {
+                  trackedRunId = recentRun.id
+                  console.log(`Found our workflow run: ${trackedRunId}, status: ${recentRun.status}`)
+                }
+              }
+              
+              // If we have a tracked run, check if it's completed
+              if (trackedRunId) {
+                const trackedRun = runs.data.workflow_runs.find(run => run.id === trackedRunId)
+                
+                if (!trackedRun) {
+                  console.log(`Warning: Tracked run ${trackedRunId} not found in recent runs, fetching directly`)
+                  // Fetch the specific run
+                  try {
+                    const specificRun = await github.rest.actions.getWorkflowRun({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      run_id: trackedRunId
+                    })
+                    if (specificRun.data.status === 'completed') {
+                      workflowRun = specificRun.data
+                      break
+                    }
+                    console.log(`Run ${trackedRunId} status: ${specificRun.data.status}`)
+                  } catch (error) {
+                    console.log(`Error fetching run ${trackedRunId}:`, error.message)
+                  }
+                } else if (trackedRun.status === 'completed') {
+                  workflowRun = trackedRun
+                  break
+                } else {
+                  console.log(`Run ${trackedRunId} status: ${trackedRun.status}`)
+                }
               }
               
               console.log(`Waiting for workflow to complete... (${Math.round(elapsedTime/1000)}s elapsed)`)
@@ -129,7 +169,10 @@ jobs:
             }
             
             if (!workflowRun) {
-              throw new Error('Workflow did not complete within timeout period')
+              const errorMsg = trackedRunId 
+                ? `Workflow run ${trackedRunId} did not complete within timeout period`
+                : 'Could not find dispatched workflow run within timeout period'
+              throw new Error(errorMsg)
             }
             
             console.log(`Workflow completed with status: ${workflowRun.conclusion}`)
