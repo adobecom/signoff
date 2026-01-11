@@ -470,7 +470,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 console.log(`      ├─ Cart Total: ${cartTotal}`);
                 console.log(`      └─ Next Billing: ${cartTotalNext}`);
                 
-                await page.screenshot({ path: `screenshots/teams-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
+                await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
 
                 const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
                 const digitOnlySubTotal = cartSubTotal.split('/')[0].replace(/[^\d]/g, '');
