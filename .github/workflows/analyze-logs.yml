@@ -7,6 +7,16 @@ on:
         description: 'GitHub Actions or CircleCI run URL to analyze'
         required: true
         type: string
+      jira_issue_key:
+        description: 'Empty string for creating a new issue'
+        required: false
+        default: 'MWPW-185796'
+        type: string
+      slack_channel:
+        description: 'Slack channel to send the notification to'
+        required: false
+        default: "#loot-loaders-tests"
+        type: string
 
 jobs:
   trigger-circleci:
@@ -16,12 +26,16 @@ jobs:
         run: |
           # Prepare parameters for CircleCI
           RUN_URL="${{ inputs.run_url }}"
+          JIRA_ISSUE_KEY="${{ inputs.jira_issue_key }}"
+          SLACK_CHANNEL="${{ inputs.slack_channel }}"
           
           PARAMETERS=$(cat <<EOF
           {
             "branch": "dev",
             "parameters": {
-              "run_url": "${RUN_URL}"
+              "run_url": "${RUN_URL}",
+              "jira_issue_key": "${JIRA_ISSUE_KEY}",
+              "slack_channel": "${SLACK_CHANNEL}"
             }
           }
           EOF
