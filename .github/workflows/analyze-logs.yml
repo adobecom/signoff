@@ -8,9 +8,9 @@ on:
         required: true
         type: string
       jira_issue_key:
-        description: 'Empty string for creating a new issue'
+        description: 'Empty string for creating a new issue. Test ticket: MWPW-185796'
         required: false
-        default: 'MWPW-185796'
+        default: ''
         type: string
       slack_channel:
         description: 'Slack channel to send the notification to'
