@@ -409,15 +409,17 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               const priceOption = new PriceOption(priceOptions[k]);
 
               let priceTextAgain;
+              let price = null;
               try {
                 await priceOption.price.first().waitFor({ state: 'visible', timeout: 10000 });
-                const price = await priceOption.price.first();
+                price = await priceOption.price.first();
                 priceTextAgain = await price.textContent();
               } catch (error) {
                 try {
                   await priceOption.priceInPromoHtml.first().waitFor({ state: 'visible', timeout: 10000 });
                   const priceInPromoHtml = await priceOption.priceInPromoHtml.first();
                   const priceInPromoHtmlText = await priceInPromoHtml.textContent();
+                  price = priceInPromoHtml;
                   priceTextAgain = priceInPromoHtmlText;
                 } catch (error) {
                   // ignore
@@ -435,7 +437,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
               try {
                 await priceOption.option.waitFor({ state: 'visible', timeout: 10000 });
-                await priceOption.option.click();
+                //await priceOption.option.click();
+                await price.click();
                 await page.waitForTimeout(1000);
                 await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
                 await modal.continueButton.first().click();
