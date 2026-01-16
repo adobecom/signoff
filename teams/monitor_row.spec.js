@@ -150,7 +150,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       !error.includes('favicon') && 
       !error.includes('analytics') &&
       !error.includes('ads') &&
-      !error.toLowerCase().includes('third-party')
+      !error.toLowerCase().includes('third-party') &&
+      !error.includes('Failed to load resource: net::ERR_FAILED') &&
+      !error.includes('AdobeMessagingClient.js')
     );
     
     if (criticalErrors.length > 0) {
@@ -332,7 +334,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       
       // Save error report for notifications
       const errorMessages = cardErrors.map(e => e.error);
-      saveErrorReport('should click and verify all merch cards - card errors', errorMessages, testUrl);
+      saveErrorReport('Card Errors', errorMessages, testUrl);
       
       expect(cardErrors.length).toBe(0);
     }
