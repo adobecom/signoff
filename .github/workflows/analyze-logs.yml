@@ -12,8 +12,13 @@ on:
         required: false
         default: ''
         type: string
-      slack_channel:
-        description: 'Slack channel to send the notification to'
+      slack_channel_jira:
+        description: 'Slack channel to send the notification about the Jira issue'
+        required: false
+        default: "#loot-loaders-tests"
+        type: string
+      slack_channel_alert:
+        description: 'Slack channel to send the analyze logs notification'
         required: false
         default: "#loot-loaders-tests"
         type: string
@@ -27,15 +32,17 @@ jobs:
           # Prepare parameters for CircleCI
           RUN_URL="${{ inputs.run_url }}"
           JIRA_ISSUE_KEY="${{ inputs.jira_issue_key }}"
-          SLACK_CHANNEL="${{ inputs.slack_channel }}"
-          
+          SLACK_CHANNEL_JIRA="${{ inputs.slack_channel_jira }}"
+          SLACK_CHANNEL_ALERT="${{ inputs.slack_channel_alert }}"
+
           PARAMETERS=$(cat <<EOF
           {
             "branch": "dev",
             "parameters": {
               "run_url": "${RUN_URL}",
               "jira_issue_key": "${JIRA_ISSUE_KEY}",
-              "slack_channel": "${SLACK_CHANNEL}"
+              "slack_channel_jira": "${SLACK_CHANNEL_JIRA}",
+              "slack_channel_alert": "${SLACK_CHANNEL_ALERT}"
             }
           }
           EOF
