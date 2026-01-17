@@ -502,7 +502,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 optionResult.error.push(errorMessage);
               } finally {
                 await page.goBack();
-                await page.waitForTimeout(1000);
+                await page.waitForTimeout(3000);
               }
 
               if (optionResult.error.length > 0) {
@@ -513,6 +513,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               }
 
               if (newUrl === testUrl) {
+                await merchCard.checkoutLink.first().waitFor({ state: 'visible', timeout: 10000 });
                 await merchCard.checkoutLink.first().click();
                 await page.waitForTimeout(5000);
                 try {
