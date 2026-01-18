@@ -183,6 +183,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
     console.log('─'.repeat(80));
 
     for (let i = 0; i < tabs.length; i++) {
+      if (process.env.TEST_TAB && parseInt(process.env.TEST_TAB) !== i) {
+        console.log(`Skipping tab ${i} as TEST_TAB is set to ${process.env.TEST_TAB}`);
+        continue;
+      }
       const tab = tabs[i];
       const tabTitle = await tab.textContent();
 
@@ -205,6 +209,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       await page.screenshot({ path: `screenshots/plans-tab-${i + 1}.png`});
 
       for (let j = 0; j < merchCards.length; j++) {
+        // if TEST_CARD is set, use it to skip the card
+        if (process.env.TEST_CARD && parseInt(process.env.TEST_CARD) !== j) {
+          console.log(`  │  Skipping card ${j} as TEST_CARD is set to ${process.env.TEST_CARD}`);
+          continue;
+        }
         // Check if this card already passed in a previous run
         if (stateManager.hasCardPassed(i, j)) {
           console.log(`  │  ⏭️  Skipping already passed card: Tab ${i + 1}, Card ${j + 1}`);
@@ -443,7 +452,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           try {
             await page.screenshot({ 
               path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-exception.png`,
-              fullPage: true 
+              timeout: 5000
             });
           } catch (screenshotError) {
             console.log(`  │  │     Failed to capture exception screenshot: ${screenshotError.message}`);

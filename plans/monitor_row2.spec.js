@@ -576,7 +576,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           try {
             await page.screenshot({ 
               path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-exception.png`,
-              fullPage: true 
+              timeout: 5000
             });
           } catch (screenshotError) {
             console.log(`   Failed to capture exception screenshot: ${screenshotError.message}`);
