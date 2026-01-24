@@ -178,6 +178,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
     const tabs = await plansPage.tabs.all();
 
+    // get the page global variable ttMETA
+    const ttMeta = await page.evaluate(() => window.ttMETA);
+    console.log(`Target Test Campaign ttMeta:\n${JSON.stringify(ttMeta, null, 2)}`);
+  
     console.log('\n' + '─'.repeat(80));
     console.log(`📑 TABS DISCOVERY: Found ${tabs.length} tabs to test`);
     console.log('─'.repeat(80));

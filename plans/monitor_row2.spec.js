@@ -225,6 +225,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       const tab = tabs[i];
       const tabTitle = await tab.textContent();
 
+      // get the page global variable ttMETA
+      const ttMeta = await page.evaluate(() => window.ttMETA);
+      console.log(`Target Test Campaign ttMeta:\n${JSON.stringify(ttMeta, null, 2)}`);
+
       console.log(`\n${'='.repeat(80)}`);
       console.log(`🔍 Testing Tab ${i + 1}/${tabs.length}: "${tabTitle}"`);
       console.log(`${'='.repeat(80)}`);
