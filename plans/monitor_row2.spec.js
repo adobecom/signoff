@@ -590,11 +590,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           console.log(`   🔄 Card will be retried on next run`);
 
           try {
-            await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000 });
+            // Clear any stored state first
+            await page.evaluate(async () => { await localStorage.clear(); await sessionStorage.clear(); });
+            await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000, referer: undefined }); // This forces a fresh load from the server
           } catch (err) {
             console.log('Timeout on Waiting for network idle!');
           }
-          await tabs[i].click();
+          await tabs[i].click({ timeout: 10000 });
           await page.waitForTimeout(1000);
         }
         
