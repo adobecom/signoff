@@ -408,6 +408,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             console.log(`   Available Options: ${productOptionResults.map(result => result.optionTitle).join(' | ')}`);
             
             for (let k = 0; k < priceOptions.length; k++) {
+              try {
+                await expect(plansPage.checkoutModal).toBeVisible({timeout: 10000});
+              } catch (error) {
+                const errorMessage = `Modal not found for "${productName}" (Tab "${tabTitle}", Card ${j + 1}, Option ${k + 1})`;
+                console.log(`❌ ${errorMessage}`);
+                await merchCard.checkoutLink.first().click()
+              }
 
               const optionResult = productOptionResults[k];
               const priceOption = new PriceOption(priceOptions[k]);
