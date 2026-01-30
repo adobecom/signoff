@@ -1,0 +1,154 @@
+name: Test Page Load v2
+
+on:
+  workflow_dispatch:
+    inputs:
+      testCodeBranch:
+        description: 'Test Code Branch'
+        required: true
+        default: 'main'
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options: 
+          - prod
+          - stage                
+      hostsHack:
+        description: 'Hosts File Hack'
+        required: false
+        type: string
+      workers:
+        description: 'Number of test workers'
+        required: true
+        default: '3'
+        type: string
+      delay:
+        description: 'Delay between requests (ms)'
+        required: true
+        default: '0'
+        type: string
+      gist_urls:
+        description: 'Gist ID of Input URLs'
+        required: false
+        type: string        
+
+jobs:
+  run-tests-gha:
+    if: ${{ github.event.inputs.environment == 'prod' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        include:
+          - os: ubuntu-latest
+            browser: chromium
+       
+    name: Smoke Test
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Hosts file hack
+        if: "${{ github.event.inputs.hostsHack != '' }}"
+        run: echo ${{ inputs.hostsHack }} | sudo tee -a /etc/hosts
+
+      - name: Check hosts file
+        run: cat /etc/hosts
+
+      - name: Check IP
+        run: curl -s https://api.ipify.org
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.testCodeBranch }}
+
+      - name: Cache dependencies
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ./node_modules
+          key: modules-${{ hashFiles('package-lock.json') }}-${{ runner.os }}
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Install browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run the tests
+        run: npx playwright test test/pageload2.spec.js --workers ${{ inputs.workers }} --project=chromium
+        env:
+          GIST_URLS: ${{ inputs.gist_urls }}
+          REQUEST_DELAY: ${{ inputs.delay }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Save test logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: |
+            screenshots/
+            playwright-report/
+          retention-days: 30
+
+      - name: Save test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 30
+  run-tests-selfhosted:
+    if: ${{ github.event.inputs.environment == 'stage' }}
+    name: Smoke Test
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.testCodeBranch }}
+
+      - name: Cache dependencies
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ./node_modules
+          key: modules-${{ hashFiles('package-lock.json') }}-Linux
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the tests
+        run: npx playwright test test/pageload2.spec.js --workers ${{ inputs.workers }} --project=chromium
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          GIST_URLS: ${{ inputs.gist_urls }}
+          REQUEST_DELAY: ${{ inputs.delay }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Save test logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: |
+            screenshots/
+            playwright-report/
+          retention-days: 30
+
+      - name: Save test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 30          
+        
