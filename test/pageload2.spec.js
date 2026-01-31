@@ -216,13 +216,29 @@ const testPageLoad = async ({ page }, testInfo) => {
     testResult.screenshots.push(fullPageScreenshot);
 
     // Filter out common non-critical errors
-    const criticalErrors = errors.filter(error =>
-      !error.includes('favicon') &&
-      !error.includes('analytics') &&
-      !error.includes('ads') &&
-      !error.toLowerCase().includes('third-party')
-    );
-  
+    let ignoredErrorPatterns = [
+      'favicon',
+      'analytics',
+      'ads',
+      'third-party'
+    ];
+    
+    // Load additional ignored patterns from YAML file
+    const consoleErrorsIgnoredPath = path.join(__dirname, 'console_errors_ignored.yml');
+    if (fs.existsSync(consoleErrorsIgnoredPath)) {
+      const additionalIgnoredPatterns = yaml.load(
+        fs.readFileSync(consoleErrorsIgnoredPath, "utf8")
+      );
+      if (Array.isArray(additionalIgnoredPatterns)) {
+        ignoredErrorPatterns = [...ignoredErrorPatterns, ...additionalIgnoredPatterns];
+      }
+    }
+    
+    const criticalErrors = errors.filter(error => {
+      return !ignoredErrorPatterns.some(pattern => 
+        error.toLowerCase().includes(pattern.toLowerCase())
+      );
+    });  
 
     const allHrefs = await page.evaluate(() => {
       return Array.from(document.links).map((item) => item.href);
