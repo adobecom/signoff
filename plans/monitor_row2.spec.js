@@ -58,6 +58,8 @@ class CartPage {
     this.cartSubTotal = page.locator('[data-testid="cart-totals-subtotals-row"] [data-testid="price-full-display"]').filter({visible: true});
     this.cartTotal = page.locator('[class*="CartTotals__cart-totals-total-price"] [data-testid="price-full-display"]').filter({visible: true});
     this.cartTotalNext = page.locator('[data-testid="cart-totals-upcoming-dueNext-total"] [data-testid="price-full-display"]').filter({visible: true});
+    this.itemRemoveButton = page.locator('[data-testid="cart-item-remove-btn"]').filter({visible: true});
+    this.confirmButton = page.locator('[data-testid="modal"] [data-variant="primary"]').filter({visible: true});
   }
 }
 
@@ -463,8 +465,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               await page.waitForTimeout(5000);
               await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png`});
 
+              const cartPage = new CartPage(page);
+
               try {
-                const cartPage = new CartPage(page);
                 try {
                   await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
                 } catch (error) {
@@ -506,14 +509,25 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 } else {
                   console.log(`      ✓ Price validation passed`);
                 }
+                
               } catch (error) {
                 await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}-price-error.png`});
                 const errorMessage = `${error.message} for ${tabTitle} > ${productName} > ${priceOptionText}`;
                 console.log(`❌ ${errorMessage}`);
                 optionResult.error.push(errorMessage);
               } finally {
-                await page.goBack();
-                await page.waitForTimeout(3000);
+                if (k === priceOptions.length - 1 && await cartPage.itemRemoveButton.count() > 0) {
+                  await cartPage.itemRemoveButton.first().click();
+                  await page.waitForTimeout(1000);
+                  await expect(cartPage.confirmButton.first()).toBeVisible({timeout: 10000});
+                  await cartPage.confirmButton.first().click();
+                  await page.waitForTimeout(1000);
+                  console.log(`Removed the item from the cart`);
+                  continue;
+                } else {
+                  await page.goBack();
+                  await page.waitForTimeout(3000);
+                }
               }
 
               if (optionResult.error.length > 0) {
@@ -521,6 +535,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 cardHasOptionErrors = true;
               } else {
                 delete optionResult.error;
+              }
+
+              if (k === priceOptions.length - 1) {
+                continue;
               }
 
               if (newUrl === testUrl) {
@@ -546,7 +564,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             
             optionResults.push(...productOptionResults);
 
-            await plansPage.modalCloseButton.first().click();
+            try {
+              await page.evaluate(async () => { await localStorage.clear(); await sessionStorage.clear(); });
+              await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000, referer: undefined }); // This forces a fresh load from the server
+            } catch (err) {
+            }
+            await tabs[i].click({ timeout: 10000 });
+            await page.waitForTimeout(1000);
           } else {
             console.log(`Redirected to URL ${newUrl}`);
             await page.waitForTimeout(5000);
@@ -583,14 +607,14 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           cardResult.error = errorMessage;
           cardResult.cardTitle = cardResult.cardTitle || `Card ${j + 1}`;
           
-          // Take screenshot of current state for debugging
-          try {
+          // if not browser crash, take screenshot of current state
+          if (errorMessage.includes('crash')) {
+            console.log(`  │  │     ${errorMessage}`);
+          } else {
             await page.screenshot({ 
               path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-exception.png`,
               timeout: 5000
             });
-          } catch (screenshotError) {
-            console.log(`   Failed to capture exception screenshot: ${screenshotError.message}`);
           }
           
           // Card will NOT be marked as passed, so it will be retried
@@ -599,9 +623,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           try {
             // Clear any stored state first
             await page.evaluate(async () => { await localStorage.clear(); await sessionStorage.clear(); });
-            await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000, referer: undefined }); // This forces a fresh load from the server
+            await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000, referer: undefined });
+            await page.waitForTimeout(2000);
           } catch (err) {
-            console.log('Timeout on Waiting for network idle!');
           }
           await tabs[i].click({ timeout: 10000 });
           await page.waitForTimeout(1000);
