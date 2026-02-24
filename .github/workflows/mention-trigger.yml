@@ -11,18 +11,21 @@ jobs:
     if: contains(github.event.comment.body, '@AgentTed')
     runs-on: ubuntu-latest
     steps:
+      # Use github-script so user-controlled comment body is never interpolated
+      # into a shell command (fixes CVE: command injection via comment content).
       - name: Send Payload
-        run: |
-          curl -X POST \
-          -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/AgentTed/bot/dispatches \
-          -d '{
-            "event_type": "mention_trigger",
-            "client_payload": {
-              "comment_body": "${{ github.event.comment.body }}",
-              "author": "${{ github.event.comment.user.login }}",
-              "html_url": "${{ github.event.comment.html_url }}",
-              "issue_title": "${{ github.event.issue.title }}"
-            }
-          }'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'AgentTed',
+              repo: 'bot',
+              event_type: 'mention_trigger',
+              client_payload: {
+                comment_body: context.payload.comment.body,
+                author: context.payload.comment.user.login,
+                html_url: context.payload.comment.html_url,
+                issue_title: context.payload.issue?.title || ''
+              }
+            });
