@@ -60,6 +60,7 @@ class CartPage {
     this.cartTotalNext = page.locator('[data-testid="cart-totals-upcoming-dueNext-total"] [data-testid="price-full-display"]').filter({visible: true});
     this.itemRemoveButton = page.locator('[data-testid="cart-item-remove-btn"]').filter({visible: true});
     this.confirmButton = page.locator('[data-testid="modal"] [data-variant="primary"]').filter({visible: true});
+    this.quantity = page.locator('[data-testid="quantity-dropdown-spectrum2"] [slot="label"]').filter({visible: true});
   }
 }
 
@@ -482,14 +483,24 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 if (await cartPage.cartTotalNext.count() > 0) {
                   cartTotalNext = await cartPage.cartTotalNext.first().textContent();
                 }
+                let quantity = 'N/A';
+                if (await cartPage.quantity.count() > 0) {
+                  quantity = await cartPage.quantity.first().textContent();
+                }
+
                 console.log(`\n   🛒 Testing Option: ${priceOptionText}`);
+                console.log(`      ├─ Quantity: ${quantity}`);
                 console.log(`      ├─ Cart Subtotal: ${cartSubTotal}`);
                 console.log(`      ├─ Cart Total: ${cartTotal}`);
                 console.log(`      └─ Next Billing: ${cartTotalNext}`);
                 
                 await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}-cart.png` }  );
 
-                const digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
+                let digitOnlyPrice = priceOptionText.split('/')[0].replace(/[^\d]/g, '');
+                if (parseInt(quantity) > 1) {
+                  digitOnlyPrice = (parseInt(digitOnlyPrice) * parseInt(quantity)).toString();
+                }
+
                 const digitOnlySubTotal = cartSubTotal.split('/')[0].replace(/[^\d]/g, '');
                 const digitOnlyTotal = cartTotal.split('/')[0].replace(/[^\d]/g, '');
                 const digitOnlyTotalNext = cartTotalNext.split('/')[0].replace(/[^\d]/g, '');
