@@ -264,7 +264,17 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             console.log(`         → Modal tab: ${tabTestId}`);
             const isBusinessTab = tabTestId === 'team';
           } catch (error) {
-            console.log(`         ⚠️  No selected tab found in modal`);        
+            console.log(`         ⚠️  No selected tab found in modal`);    
+            // it could go directly to the cart page, so we need to check if the cart page is loaded
+            const cartPage = new CartPage(page);
+            await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 10000 });
+            if (await cartPage.cartSubTotal.count() > 0) {
+              console.log(`         ✓ Cart page loaded\n`);
+              // go back to the test page
+              await page.goBack();
+              await page.waitForTimeout(1000);
+              continue;
+            }    
           }
 
           try {
