@@ -263,31 +263,47 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             const tabTestId = await modal.selectedTab.first().getAttribute('data-query-value')
             console.log(`         → Modal tab: ${tabTestId}`);
             const isBusinessTab = tabTestId === 'team';
-          } catch (error) {
-            console.log(`         ⚠️  No selected tab found in modal`);    
-            // it could go directly to the cart page, so we need to check if the cart page is loaded
-            const cartPage = new CartPage(page);
-            await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 10000 });
-            if (await cartPage.cartSubTotal.count() > 0) {
-              console.log(`         ✓ Cart page loaded\n`);
-              // go back to the test page
-              await page.goBack();
-              await page.waitForTimeout(1000);
+            if (!isBusinessTab) {
+              console.log(`         ⚠️  Not a business tab\n`);
+              cardErrors.push({
+                tabIndex: i,
+                tabText,
+                cardIndex: cardIndex,
+                cardText: productName,
+                error: `Not a business tab in the modal for ${productName}`,
+              });
               continue;
-            }    
+            }
+          } catch (error) {
+            // frame.io doesn't have a selected tab.
+            console.log(`         ⚠️  No selected tab found in modal`);        
           }
 
           try {
             await modal.priceOptions.first().waitFor({state: 'visible', timeout: 10000});
           } catch (error) {
-            cardErrors.push({
-              tabIndex: i,
-              tabText,
-              cardIndex: cardIndex,
-              cardText: productName,
-              error: `No price options found for ${productName}`,
-            });
-            console.log(`         ❌ No price options found\n`);
+            // it could go directly to the cart page, so we need to check if the cart page is loaded
+            const cartPage = new CartPage(page);
+            try {
+              await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 10000 });
+              if (await cartPage.cartSubTotal.count() > 0) {
+                console.log(`         ✓ Cart page loaded\n`);
+                // go back to the test page
+                await page.goBack();
+                await page.waitForTimeout(1000);
+                continue;
+              }
+            } catch (error) {
+              console.log(`         ❌ Error checking cart page: ${error.message}`);
+              cardErrors.push({
+                tabIndex: i,
+                tabText,
+                cardIndex: cardIndex,
+                cardText: productName,
+                error: `No price options found for ${productName}`,
+              });
+              console.log(`         ❌ No price options found\n`);
+            }
           }
 
           await page.screenshot({ 
@@ -301,9 +317,6 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             console.log(`         ✓ Continue button ready`);          
           } catch (error) {
             console.log(`         ❌ Continue button not ready\n`);
-            await modal.modalCloseButton.first().click();
-            await page.waitForTimeout(1000);
-            continue;
           }
           const priceOptions = await modal.priceOptions.all();
           const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
