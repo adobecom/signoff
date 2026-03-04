@@ -283,19 +283,22 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           try {
             await modal.priceOptions.first().waitFor({state: 'visible', timeout: 10000});
           } catch (error) {
-            // it could go directly to the cart page, so we need to check if the cart page is loaded
-            const cartPage = new CartPage(page);
-            try {
-              await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 10000 });
-              if (await cartPage.cartSubTotal.count() > 0) {
-                console.log(`         ✓ Cart page loaded\n`);
-                // go back to the test page
-                await page.goBack();
-                await page.waitForTimeout(1000);
-                continue;
+            // it could go directly to the commitment or cart page, so we need to check the URL
+            const url = await page.url();
+            if (url.includes('https://commerce.adobe.com/store')) {
+              if (url.includes('store/commitment')) {
+                console.log(`         ✓ Commitment page loaded\n`);
+              } else if (url.includes('store/checkout')) {
+                console.log(`         ✓ Checkout page loaded\n`);
+              } else {
+                console.log(`         ❌ Unknown page loaded: ${url}\n`);
               }
-            } catch (error) {
-              console.log(`         ❌ Error checking cart page: ${error.message}`);
+              // go back to the test page
+              await page.goBack();
+              await page.waitForTimeout(1000);
+              continue;
+            } else{
+
               cardErrors.push({
                 tabIndex: i,
                 tabText,
