@@ -511,11 +511,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                   // Determine which cart price to compare (prefer subtotal, then total, then next)
                   let cartPriceToCompare = digitOnlySubTotal !== '' ? digitOnlySubTotal : (digitOnlyTotal !== '' ? digitOnlyTotal : digitOnlyTotalNext);
                   let cartPriceDisplay = digitOnlySubTotal !== '' ? cartSubTotal : (digitOnlyTotal !== '' ? cartTotal : cartTotalNext);
-                  
-                  // Determine direction: card_lower means card price < cart price (worse for customer)
-                  const priceDirection = parseInt(digitOnlyPrice) < parseInt(cartPriceToCompare) ? '[CARD_LOWER]' : '[CARD_HIGHER]';
-                  
-                  optionResult.error.push(`${priceDirection} Cart subtotal/total does not match for ${tabTitle} > ${productName} > Card: ${priceOptionText}, Cart: ${cartPriceDisplay}`);
+                                    
+                  optionResult.error.push(`Price mismatch. ${tabTitle} > ${productName} > Card: ${priceOptionText}, Total: ${cartTotal}, Subtotal: ${cartSubTotal}, Next Billing: ${cartTotalNext}`);
                   console.log(`\n      ✗ ERROR: ${optionResult.error}`);
                 } else {
                   console.log(`      ✓ Price validation passed`);
@@ -534,7 +531,6 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                   await cartPage.confirmButton.first().click();
                   await page.waitForTimeout(1000);
                   console.log(`Removed the item from the cart`);
-                  continue;
                 } else {
                   await page.goBack();
                   await page.waitForTimeout(3000);
