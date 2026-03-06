@@ -32,6 +32,7 @@ class Modal {
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
     this.priceOptions = modal.locator('.subscription-panel-offer-price').filter({visible: true});
     this.continueButton = modal.locator('.spectrum-Button--cta').filter({visible: true});
+    this.twpContinueButton = modal.locator('.twp-Continue--btn').filter({visible: true});
   }
 }
 
@@ -280,8 +281,19 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             console.log(`         ⚠️  No selected tab found in modal`);        
           }
 
+          let twp = false;
           try {
-            await modal.priceOptions.first().waitFor({state: 'visible', timeout: 10000});
+            // if priceOptions are not found, check if the continue button is visible
+            // if the continue button is visible, click it and check if priceOptions are found again.
+            try {
+              await modal.priceOptions.first().waitFor({state: 'visible', timeout: 10000});
+            } catch (error) {
+              await modal.twpContinueButton.first().waitFor({state: 'visible', timeout: 1000});
+              await modal.twpContinueButton.first().click();
+              await page.waitForTimeout(2000);
+              await modal.priceOptions.first().waitFor({state: 'visible', timeout: 10000});
+              twp = true;
+            }
           } catch (error) {
             // it could go directly to the commitment or cart page, so we need to check the URL
             const url = await page.url();
@@ -334,6 +346,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               cardText: productName,
               optionIndex: index,
               priceOptionText: priceOptionText,
+              twp,
             });          
           }
           await expect(teamsPage.modalCloseButton.first()).toBeVisible({timeout: 10000});
@@ -377,7 +390,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       const cardText = optionResult.cardText;
       const optionIndex = optionResult.optionIndex;
       const priceOptionText = optionResult.priceOptionText;
-      
+      const twp = optionResult.twp;
+
       try {
         console.log(`\n┌${'─'.repeat(78)}┐`);
         console.log(`│ Test ${optionResults.indexOf(optionResult) + 1}/${optionResults.length}`.padEnd(79) + '│');
@@ -406,6 +420,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
         const iframe = await teamsPage.modalIframe.contentFrame();
         const modal = new Modal(iframe);
+        if (twp) {
+          await modal.twpContinueButton.first().waitFor({ state: 'visible', timeout: 10000 });
+          await modal.twpContinueButton.first().click();
+          await page.waitForTimeout(2000);
+        }
         await modal.priceOptions.nth(optionIndex).waitFor({ state: 'visible', timeout: 10000 });
         const option = await modal.priceOptions.nth(optionIndex);
         expect(option).toBeVisible({timeout: 10000});
