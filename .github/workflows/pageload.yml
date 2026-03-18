@@ -77,6 +77,8 @@ jobs:
 
       - name: Install browsers
         run: npx playwright install --with-deps ${{ matrix.browser }}
+        env:
+          APT_CONFIG: "Binary::apt::APT::Acquire::Retries=3"
 
       - name: Run the tests
         run: npx playwright test test/pageload.spec.js --workers ${{ inputs.workers }} --project=chromium
