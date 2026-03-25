@@ -40,6 +40,7 @@ class Modal {
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
     this.priceOptions = modal.locator('.subscription-panel-offer').filter({visible: true});
     this.selectedPriceOption = modal.locator('input[checked]+label .subscription-panel-offer-price [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
+    this.selectedPriceOptionRelax = modal.locator('input[checked]+label :is(.subscription-panel-offer-price,.subscription-panel-promo-html) [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
     this.continueButton = modal.locator('.spectrum-Button--cta').filter({visible: true});
   }
 }
@@ -354,7 +355,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             }
 
             try {
-              await modal.selectedPriceOption.first().waitFor({ state: 'visible', timeout: 10000 });
+              await modal.selectedPriceOptionRelax.first().waitFor({ state: 'visible', timeout: 10000 });
             } catch (error) {
               console.log(`❌ Selected price option not found for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Selected price option did not become visible within 10 seconds. Original error: ${error.message}`);
               throw new Error(`Selected price option not found for "${productName}"`);
@@ -365,7 +366,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             //  cardResult.error = `Two or more prices ${prices.join(', ')} in an option found for tab \"${tabTitle}\" card \"${productName}\"`;
             //  console.log(`\n   ✗ ERROR: ${cardResult.error}`);
             //}
-            const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
+            const selectedPriceOption = await modal.selectedPriceOptionRelax.first().textContent();
             console.log(`   Selected Option: ${selectedPriceOption}`);
             if (selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
               cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
