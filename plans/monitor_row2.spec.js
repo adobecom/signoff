@@ -42,6 +42,7 @@ class Modal {
     this.selectedPriceOption = modal.locator('input[checked]+label .subscription-panel-offer-price [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
     this.selectedPriceOptionRelax = modal.locator('input[checked]+label :is(.subscription-panel-offer-price,.subscription-panel-promo-html) [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
     this.continueButton = modal.locator('.spectrum-Button--cta').filter({visible: true});
+    this.commerceLink = modal.locator('a[href*="commerce.adobe.com"]').filter({visible: true});
   }
 }
 
@@ -341,12 +342,81 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               modal = new Modal(plansPage.checkoutModal);
             }
 
-            try {
-              await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
-            } catch (error) {
-              console.log(`❌ Modal price options not found for "${productName}" (Tab "${tabTitle}", Card ${j + 1}): Price options did not become visible within 10 seconds. Original error: ${error.message}`);
-              throw new Error(`Modal price options not found for "${productName}"`);
-            }
+            const hasPriceOptions = await modal.priceOptions.count() > 0;
+
+            if (!hasPriceOptions) {
+              // New modal — look for a direct commerce.adobe.com link
+              console.log(`   ℹ No subscription-panel-offer found for "${productName}" — checking for commerce link (new modal)`);
+              let commerceHref = null;
+              try {
+                await modal.commerceLink.first().waitFor({ state: 'visible', timeout: 10000 });
+                commerceHref = await modal.commerceLink.first().getAttribute('href');
+              } catch (error) {
+                cardResult.error = `No price options or commerce link found in modal for "${productName}" (Tab "${tabTitle}")`;
+                console.log(`❌ ${cardResult.error}`);
+              }
+
+              if (commerceHref) {
+                console.log(`   Commerce link: ${commerceHref}`);
+                await page.goto(commerceHref, { waitUntil: 'networkidle', timeout: 20000 });
+                await page.waitForTimeout(3000);
+                await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-commerce.png` });
+
+                const cartPage = new CartPage(page);
+                const optionResult = {
+                  tabIndex: i, tabTitle, cardIndex: j, cardTitle: productName,
+                  optionIndex: 0, optionTitle: cardPrice, error: []
+                };
+
+                try {
+                  try {
+                    await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
+                  } catch (error) {
+                    throw new Error(`Cart subtotal not found`);
+                  }
+                  const cartSubTotal = await cartPage.cartSubTotal.first().textContent();
+                  let cartTotal = 'N/A';
+                  if (await cartPage.cartTotal.count() > 0) cartTotal = await cartPage.cartTotal.first().textContent();
+                  let cartTotalNext = 'N/A';
+                  if (await cartPage.cartTotalNext.count() > 0) cartTotalNext = await cartPage.cartTotalNext.first().textContent();
+                  let quantity = 'N/A';
+                  if (await cartPage.quantity.count() > 0) quantity = await cartPage.quantity.first().textContent();
+
+                  console.log(`\n   🛒 Testing Commerce Link (new modal): ${cardPrice}`);
+                  console.log(`      ├─ Quantity: ${quantity}`);
+                  console.log(`      ├─ Cart Subtotal: ${cartSubTotal}`);
+                  console.log(`      ├─ Cart Total: ${cartTotal}`);
+                  console.log(`      └─ Next Billing: ${cartTotalNext}`);
+
+                  await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-commerce-cart.png` });
+
+                  let digitOnlyPrice = cardPrice.split('/')[0].replace(/[^\d]/g, '');
+                  if (parseInt(quantity) > 1) digitOnlyPrice = (parseInt(digitOnlyPrice) * parseInt(quantity)).toString();
+
+                  const digitOnlySubTotal = cartSubTotal.split('/')[0].replace(/[^\d]/g, '');
+                  const digitOnlyTotal = cartTotal.split('/')[0].replace(/[^\d]/g, '');
+                  const digitOnlyTotalNext = cartTotalNext.split('/')[0].replace(/[^\d]/g, '');
+
+                  if ((digitOnlySubTotal !== digitOnlyPrice) && (digitOnlyTotal !== digitOnlyPrice) && (digitOnlyTotalNext !== digitOnlyPrice)) {
+                    optionResult.error.push(`Price mismatch. ${tabTitle} > ${productName} > Card: ${cardPrice}, Total: ${cartTotal}, Subtotal: ${cartSubTotal}, Next Billing: ${cartTotalNext}`);
+                    console.log(`\n      ✗ ERROR: ${optionResult.error}`);
+                  } else {
+                    console.log(`      ✓ Price validation passed`);
+                  }
+                } catch (error) {
+                  await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-commerce-error.png` });
+                  optionResult.error.push(`${error.message} for ${tabTitle} > ${productName} > ${cardPrice}`);
+                  console.log(`❌ ${optionResult.error}`);
+                }
+
+                if (optionResult.error.length > 0) {
+                  optionResult.error = optionResult.error.join('\n');
+                } else {
+                  delete optionResult.error;
+                }
+                optionResults.push(optionResult);
+              }
+            } else {
             try {
               await modal.continueButton.first().waitFor({ state: 'visible', timeout: 10000 });
             } catch (error) {
@@ -571,6 +641,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             }
             
             optionResults.push(...productOptionResults);
+            } // end else (hasPriceOptions)
 
             try {
               await page.evaluate(async () => { await localStorage.clear(); await sessionStorage.clear(); });
