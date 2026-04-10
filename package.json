@@ -25,6 +25,9 @@
     "sinon": "^17.0.1",
     "sync-fetch": "^0.5.2"
   },
+  "overrides": {
+    "picomatch": ">=2.3.2"
+  },
   "devDependencies": {
     "@playwright/test": "^1.55.1",
     "@types/node": "^24.5.2",
