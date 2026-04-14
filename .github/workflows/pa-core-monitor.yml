@@ -1,0 +1,213 @@
+name: PA Core Monitor — Plans
+
+on:
+  schedule:
+    # Runs plans/pa-core-monitor.spec.js (via pa-monitor-config.js) every 30 min on weekdays.
+    # Window ≈ 9:00 AM Eastern → 6:00 PM Pacific in standard time (EST/PST). GitHub crons are UTC:
+    #   • Mon–Fri 14:00–23:30 UTC  → 9:00 AM–6:30 PM EST / 6:00 AM–3:30 PM PST
+    #   • Tue–Sat 00:00–02:00 UTC → continuation to 6:00 PM PST same US calendar day (9:00 PM EST)
+    # Around EDT/PDT, local times shift by about one hour until these UTC anchors are updated.
+    - cron: '*/30 14-23 * * 1-5'
+    - cron: '*/30 0-1 * * 2-6'
+    - cron: '0 2 * * 2-6'
+  workflow_dispatch:
+    inputs:
+      locale:
+        description: 'Single locale to test (e.g. "uk", "de", "" for US). Leave empty to run all configured locales.'
+        required: false
+        type: string
+      code_branch:
+        description: 'Branch to test against'
+        required: false
+        type: string
+        default: 'main'
+
+# Cancel in-flight runs for the same workflow — avoids pile-ups if 30-min slots overlap
+concurrency:
+  group: pa-core-monitor
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout signoff repository
+        uses: actions/checkout@v4
+        with:
+          repository: adobecom/signoff
+          ref: ${{ inputs.code_branch || 'main' }}
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Build matrix from pa-monitor-config.js
+        id: set-matrix
+        run: |
+          MATRIX=$(node -e "const { tier1GithubActionsMatrix } = require('./pa-monitor-config.js'); process.stdout.write(JSON.stringify(tier1GithubActionsMatrix));")
+          echo "matrix<<MATRIX_EOF" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "MATRIX_EOF" >> "$GITHUB_OUTPUT"
+
+  monitor:
+    needs: setup
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+    strategy:
+      fail-fast: false  # all locales run even if one fails
+      matrix:
+        include: ${{ fromJson(needs.setup.outputs.matrix) }}
+
+    steps:
+      - name: Checkout signoff repository
+        uses: actions/checkout@v4
+        with:
+          repository: adobecom/signoff
+          ref: ${{ inputs.code_branch || 'main' }}
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Skip matrix entries if a specific locale was requested via workflow_dispatch
+      - name: Check if this locale should run
+        id: should-run
+        run: |
+          INPUT_LOCALE="${{ inputs.locale }}"
+          THIS_LOCALE="${{ matrix.locale }}"
+          if [ -n "$INPUT_LOCALE" ] && [ "$INPUT_LOCALE" != "$THIS_LOCALE" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache node_modules
+        if: steps.should-run.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        if: steps.should-run.outputs.skip != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Set TEST_URL and TEST_SPEC from pa-monitor-config.js
+        if: steps.should-run.outputs.skip != 'true'
+        env:
+          MATRIX_LOCALE: ${{ matrix.locale }}
+          MATRIX_REGION: ${{ matrix.region }}
+        run: |
+          REGION="$MATRIX_REGION"
+
+          TEST_URL_VAL=$(node -e "
+            const { buildAdobePlansUrl } = require('./pa-monitor-config.js');
+            const loc = process.env.MATRIX_LOCALE || '';
+            process.stdout.write(buildAdobePlansUrl(loc));
+          ")
+          echo "TEST_URL=$TEST_URL_VAL" >> $GITHUB_ENV
+
+          SPEC=$(node -e "
+            const { monitorPages } = require('./pa-monitor-config.js');
+            const region = process.env.MATRIX_REGION;
+            const p = monitorPages.plans;
+            const spec = region === 'us' ? p.spec : (p.rowSpec || p.spec);
+            process.stdout.write(spec);
+          ")
+          echo "TEST_SPEC=$SPEC" >> $GITHUB_ENV
+
+      - name: Run monitor
+        if: steps.should-run.outputs.skip != 'true'
+        run: npx playwright test ${{ env.TEST_SPEC }} --project=chromium
+        env:
+          TEST_URL: ${{ env.TEST_URL }}
+          USER_AGENT_SUFFIX: ${{ secrets.USER_AGENT_SUFFIX }}
+
+      - name: Upload artifacts
+        if: steps.should-run.outputs.skip != 'true' && !cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pa-core-monitor-results-${{ matrix.label }}-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+            test-results/
+          retention-days: 14
+
+      # ── Slack: failure only — success is silent to avoid noise on scheduled cadence
+      - name: Parse error report
+        if: steps.should-run.outputs.skip != 'true' && failure()
+        id: errors
+        run: |
+          if [ -f "test-results/error-report-plans.json" ]; then
+            DETAIL=$(python3 -c "
+          import json, sys
+          d = json.load(open('test-results/error-report-plans.json'))
+          lines = [f\"• {e}\" for e in d.get('errors', [])]
+          print('\n'.join(lines[:10]))  # cap at 10 to keep Slack message readable
+          if len(d.get('errors',[])) > 10:
+              print(f\"... and {len(d['errors']) - 10} more. See CI artifacts for full report.\")
+          ")
+            # Escape newlines for use in later steps
+            echo "detail<<EOF" >> $GITHUB_OUTPUT
+            echo "$DETAIL" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "detail=No structured error report found — check CI logs." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Slack — Failure + CSO recommendation
+        if: steps.should-run.outputs.skip != 'true' && failure()
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          DETAIL="${{ steps.errors.outputs.detail }}"
+          
+          curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "channel": "#acom-commerce-alerts",
+            "username": "PA Core Monitor",
+            "icon_url": "https://github.com/actions.png?size=48",
+            "attachments": [
+              {
+                "color": "danger",
+                "title": "❌ PA Core Monitor FAILED — ${{ matrix.label }} Plans",
+                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}\n\n⚠️ *PA Core monitor (weekdays ~9am ET–6pm PT, every 30 min). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
+                "mrkdwn_in": ["text"],
+                "footer": "adobecom/signoff"
+              }
+            ]
+          }
+          EOF
+
+      # Recovery notification — fires when the job succeeds after a previous failure
+      # (GitHub doesn't natively support this; approximate with a success notification
+      #  that is easy to filter/mute in Slack if too noisy)
+      - name: Slack — Recovery
+        if: steps.should-run.outputs.skip != 'true' && success()
+        # Only post if this workflow was previously failing.
+        # Approximation: check if any artifact from previous run exists with 'pa-core-monitor-results'.
+        # For a proper consecutive-failure tracker, store state in a workflow artifact.
+        continue-on-error: true
+        run: |
+          # Only post recovery on scheduled runs, not manual dispatches
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+              -H "Content-Type: application/json" \
+              -d @- <<EOF
+          {
+            "channel": "#acom-commerce-alerts",
+            "username": "PA Core Monitor",
+            "icon_url": "https://github.com/actions.png?size=48",
+            "attachments": [
+              {
+                "color": "good",
+                "title": "✅ PA Core Monitor RECOVERED — ${{ matrix.label }} Plans",
+                "text": "URL: ${{ env.TEST_URL }}\nView run: ${RUN_URL}",
+                "footer": "adobecom/signoff"
+              }
+            ]
+          }
+          EOF
+          fi

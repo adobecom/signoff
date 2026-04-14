@@ -1,0 +1,154 @@
+# PA monitor configuration (pa-monitor-config.yml)
+# PA codes and page paths: keep aligned with pa-monitor-config.js (Playwright imports the JS file).
+# Tier 1 locale matrix for GitHub Actions is defined in pa-monitor-config.js → tier1Locales.
+# Used by CircleCI (tier2) and as documentation for plans/teams specs.
+#
+# Phase 2 (post ROW migration): add osi_codes per locale, consolidate row_spec -> spec
+
+pages:
+  plans:
+    spec: plans/pa-core-monitor.spec.js       # US — PA-scoped monitor2-style flow (see pa-monitor-config.js)
+    row_spec: plans/pa-core-monitor.spec.js   # ROW — same spec (override in JS monitorPages.plans.rowSpec if needed)
+    us_path: /creativecloud/plans.html
+    row_path: /creativecloud/plans.html
+  teams:
+    spec: teams/monitor-core.spec.js        # TBD — align with plans approach
+    row_spec: teams/monitor_row.spec.js
+    us_path: /creativecloud/business/teams.html
+    row_path: /creativecloud/business/teams.html
+
+# PA offer codes to monitor.
+# The spec finds every reference to each code on the page (all tabs, banners,
+# comparison sections) and validates price rendering + commerce CTA chain.
+offer_codes:
+  - pa: ccsn_direct_individual
+    label: CC Pro
+  - pa: ccle_direct_indirect_team
+    label: CC Pro Business
+  - pa: phsp_direct_individual
+    label: Photoshop
+  - pa: apcc_direct_individual
+    label: Acrobat Pro
+  - pa: PA-128
+    label: Photography
+
+# Phase 2: add OSI codes here after ROW migration is validated on stage
+# osi_codes:
+#   plans:
+#     us:
+#       - r_JXAnlFI7xD6FxWKl2ODvZriLYBoSL701Kd1hRyhe8
+
+tiers:
+  # Tier 1 — GitHub Actions matrix comes from pa-monitor-config.js (tier1Locales). Keep this block aligned.
+  tier1:
+    - locale: ""
+      label: US
+      region: us
+    - locale: uk
+      label: UK
+      region: row
+    - locale: de
+      label: DE
+      region: row
+    - locale: fr
+      label: FR
+      region: row
+    - locale: jp
+      label: JP
+      region: row
+    - locale: au
+      label: AU
+      region: row
+    - locale: in
+      label: IN
+      region: row
+
+  # Tier 2 — CircleCI, once-daily regional sweeps, alert only
+  tier2:
+    # LATAM
+    - { locale: ar,    region: row }
+    - { locale: br,    region: row }
+    - { locale: ca,    region: row }
+    - { locale: ca_fr, region: row }
+    - { locale: cl,    region: row }
+    - { locale: co,    region: row }
+    - { locale: cr,    region: row }
+    - { locale: ec,    region: row }
+    - { locale: gt,    region: row }
+    - { locale: la,    region: row }
+    - { locale: mx,    region: row }
+    - { locale: pe,    region: row }
+    - { locale: pr,    region: row }
+    # EMEA West/North
+    - { locale: at,    region: row }
+    - { locale: be_en, region: row }
+    - { locale: be_fr, region: row }
+    - { locale: be_nl, region: row }
+    - { locale: ch_de, region: row }
+    - { locale: ch_fr, region: row }
+    - { locale: ch_it, region: row }
+    - { locale: dk,    region: row }
+    - { locale: fi,    region: row }
+    - { locale: ie,    region: row }
+    - { locale: lu_de, region: row }
+    - { locale: lu_en, region: row }
+    - { locale: lu_fr, region: row }
+    - { locale: nl,    region: row }
+    - { locale: no,    region: row }
+    - { locale: pt,    region: row }
+    - { locale: se,    region: row }
+    # EMEA Central/East
+    - { locale: bg,    region: row }
+    - { locale: cz,    region: row }
+    - { locale: ee,    region: row }
+    - { locale: es,    region: row }
+    - { locale: gr_el, region: row }
+    - { locale: gr_en, region: row }
+    - { locale: hu,    region: row }
+    - { locale: it,    region: row }
+    - { locale: lt,    region: row }
+    - { locale: lv,    region: row }
+    - { locale: pl,    region: row }
+    - { locale: ro,    region: row }
+    - { locale: ru,    region: row }
+    - { locale: si,    region: row }
+    - { locale: sk,    region: row }
+    - { locale: tr,    region: row }
+    - { locale: ua,    region: row }
+    # EMEA MEA
+    - { locale: africa,   region: row }
+    - { locale: ae_ar,    region: row }
+    - { locale: ae_en,    region: row }
+    - { locale: eg_ar,    region: row }
+    - { locale: eg_en,    region: row }
+    - { locale: il_en,    region: row }
+    - { locale: il_he,    region: row }
+    - { locale: kw_ar,    region: row }
+    - { locale: kw_en,    region: row }
+    - { locale: mena_ar,  region: row }
+    - { locale: mena_en,  region: row }
+    - { locale: ng,       region: row }
+    - { locale: qa_ar,    region: row }
+    - { locale: qa_en,    region: row }
+    - { locale: sa_ar,    region: row }
+    - { locale: sa_en,    region: row }
+    - { locale: za,       region: row }
+    # APAC
+    - { locale: cn,    region: row }
+    - { locale: hk_en, region: row }
+    - { locale: hk_zh, region: row }
+    - { locale: id_en, region: row }
+    - { locale: id_id, region: row }
+    - { locale: in_hi, region: row }
+    - { locale: kr,    region: row }
+    - { locale: my_en, region: row }
+    - { locale: my_ms, region: row }
+    - { locale: nz,    region: row }
+    - { locale: ph_en, region: row }
+    - { locale: ph_fil,region: row }
+    - { locale: sg,    region: row }
+    - { locale: th_en, region: row }
+    - { locale: th_th, region: row }
+    - { locale: tw,    region: row }
+    - { locale: vn_en, region: row }
+    - { locale: vn_vi, region: row }
