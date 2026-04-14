@@ -2,14 +2,8 @@ name: PA Core Monitor — Plans
 
 on:
   schedule:
-    # Runs plans/pa-core-monitor.spec.js (via pa-monitor-config.js) every 30 min on weekdays.
-    # Window ≈ 9:00 AM Eastern → 6:00 PM Pacific in standard time (EST/PST). GitHub crons are UTC:
-    #   • Mon–Fri 14:00–23:30 UTC  → 9:00 AM–6:30 PM EST / 6:00 AM–3:30 PM PST
-    #   • Tue–Sat 00:00–02:00 UTC → continuation to 6:00 PM PST same US calendar day (9:00 PM EST)
-    # Around EDT/PDT, local times shift by about one hour until these UTC anchors are updated.
-    - cron: '*/30 14-23 * * 1-5'
-    - cron: '*/30 0-1 * * 2-6'
-    - cron: '0 2 * * 2-6'
+    # Every 30 minutes, 24/7 (UTC). Scheduled runs pause for 24h after a failed monitor (see setup pause-gate); workflow_dispatch always runs.
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       locale:
@@ -22,6 +16,10 @@ on:
         type: string
         default: 'main'
 
+permissions:
+  contents: read
+  actions: read
+
 # Cancel in-flight runs for the same workflow — avoids pile-ups if 30-min slots overlap
 concurrency:
   group: pa-core-monitor
@@ -32,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      pause_skip: ${{ steps.pause-gate.outputs.pause_skip }}
     steps:
       - name: Checkout signoff repository
         uses: actions/checkout@v4
@@ -48,8 +47,73 @@ jobs:
           echo "$MATRIX" >> "$GITHUB_OUTPUT"
           echo "MATRIX_EOF" >> "$GITHUB_OUTPUT"
 
+      - name: Pause gate — scheduled runs skip 24h after a failed monitor; manual always runs
+        id: pause-gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.setOutput('pause_skip', 'false');
+              core.info('Manual run — never pause.');
+              return;
+            }
+
+            const workflowId = 'pa-core-monitor.yml';
+            const branch = context.ref.replace('refs/heads/', '');
+            const pauseMs = 24 * 60 * 60 * 1000;
+
+            const { data: listData } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflowId,
+              branch,
+              status: 'completed',
+              per_page: 30,
+            });
+
+            const runs = listData.workflow_runs || [];
+
+            for (const run of runs) {
+              const { data: jobsData } = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              });
+
+              const monitorJobs = jobsData.jobs.filter(j => j.name.toLowerCase().startsWith('monitor'));
+              if (monitorJobs.length === 0) continue;
+
+              const anyMonitorRan = monitorJobs.some(
+                j => j.status === 'completed' && j.conclusion !== 'skipped',
+              );
+              if (!anyMonitorRan) continue;
+
+              const ended = new Date(run.updated_at).getTime();
+              const ageMs = Date.now() - ended;
+
+              if (run.conclusion === 'failure') {
+                const pause = ageMs < pauseMs;
+                core.setOutput('pause_skip', pause ? 'true' : 'false');
+                core.info(
+                  pause
+                    ? `Pausing schedules: failure in run ${run.id} ended ${run.updated_at}`
+                    : `Last failed monitor (${run.id}) is older than 24h — resume.`,
+                );
+                return;
+              }
+
+              core.setOutput('pause_skip', 'false');
+              core.info(`Last monitor run ${run.id} concluded ${run.conclusion} — not pausing.`);
+              return;
+            }
+
+            core.setOutput('pause_skip', 'false');
+            core.info('No prior monitor runs found — not pausing.');
+
   monitor:
     needs: setup
+    if: needs.setup.outputs.pause_skip != 'true'
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.56.0-noble
@@ -172,7 +236,7 @@ jobs:
               {
                 "color": "danger",
                 "title": "❌ PA Core Monitor FAILED — ${{ matrix.label }} Plans",
-                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}\n\n⚠️ *PA Core monitor (weekdays ~9am ET–6pm PT, every 30 min). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
+                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}\n\n⚠️ *PA Core monitor (every 30 min UTC; scheduled runs pause 24h after a failure — run workflow manually to retry sooner). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
                 "mrkdwn_in": ["text"],
                 "footer": "adobecom/signoff"
               }
@@ -180,34 +244,59 @@ jobs:
           }
           EOF
 
-      # Recovery notification — fires when the job succeeds after a previous failure
-      # (GitHub doesn't natively support this; approximate with a success notification
-      #  that is easy to filter/mute in Slack if too noisy)
-      - name: Slack — Recovery
-        if: steps.should-run.outputs.skip != 'true' && success()
-        # Only post if this workflow was previously failing.
-        # Approximation: check if any artifact from previous run exists with 'pa-core-monitor-results'.
-        # For a proper consecutive-failure tracker, store state in a workflow artifact.
+  # One Slack when scheduled monitors succeed after a failed completed run (avoids N matrix posts).
+  recovery-slack:
+    runs-on: ubuntu-latest
+    needs: [setup, monitor]
+    if: >-
+      always() &&
+      needs.setup.outputs.pause_skip != 'true' &&
+      needs.monitor.result == 'success' &&
+      github.event_name == 'schedule'
+    steps:
+      - name: Slack — Recovery (only if previous completed run failed)
         continue-on-error: true
-        run: |
-          # Only post recovery on scheduled runs, not manual dispatches
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
-              -H "Content-Type: application/json" \
-              -d @- <<EOF
-          {
-            "channel": "#acom-commerce-alerts",
-            "username": "PA Core Monitor",
-            "icon_url": "https://github.com/actions.png?size=48",
-            "attachments": [
-              {
-                "color": "good",
-                "title": "✅ PA Core Monitor RECOVERED — ${{ matrix.label }} Plans",
-                "text": "URL: ${{ env.TEST_URL }}\nView run: ${RUN_URL}",
-                "footer": "adobecom/signoff"
-              }
-            ]
-          }
-          EOF
-          fi
+        uses: actions/github-script@v7
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        with:
+          script: |
+            const workflowId = 'pa-core-monitor.yml';
+            const branch = context.ref.replace('refs/heads/', '');
+            const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflowId,
+              branch,
+              status: 'completed',
+              per_page: 5,
+            });
+            const prev = (data.workflow_runs || [])[0];
+            if (!prev || prev.conclusion !== 'failure') {
+              core.info('No recovery Slack — previous completed run was not a failure.');
+              return;
+            }
+
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const payload = {
+              channel: '#acom-commerce-alerts',
+              username: 'PA Core Monitor',
+              icon_url: 'https://github.com/actions.png?size=48',
+              attachments: [
+                {
+                  color: 'good',
+                  title: '✅ PA Core Monitor RECOVERED — Plans',
+                  text: `Previous run failed; this scheduled run succeeded.\nView run: ${runUrl}`,
+                  footer: 'adobecom/signoff',
+                },
+              ],
+            };
+
+            const res = await fetch(process.env.SLACK_WEBHOOK, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+              core.warning(`Slack webhook HTTP ${res.status}`);
+            }
