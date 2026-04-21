@@ -212,6 +212,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         console.log(`Skipping tab ${i} as TEST_TAB is set to ${process.env.TEST_TAB}`);
         continue;
       }
+      if (process.env.SKIP_TAB && parseInt(process.env.SKIP_TAB) === i) {
+        console.log(`Skipping tab ${i} as SKIP_TAB is set to ${process.env.SKIP_TAB}`);
+        continue;
+      }
       // For JP, use a specialized testUrl for tab 0
       if (countryCode === 'jp') {
         if (i === 0) {
