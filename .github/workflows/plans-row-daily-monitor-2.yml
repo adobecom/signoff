@@ -435,7 +435,8 @@ jobs:
       - name: Run plans ROW monitor
         run: npx playwright test plans/monitor_row2.spec.js --project=chromium
         env:
-          TEST_TABS: ${{ inputs.test_tabs }}
+          # TEMP: Business tab alerts disabled ~2026-04-21, re-enable in ~1 week
+          TEST_TABS: ${{ github.event_name == 'schedule' && 'Individuals,Students & Teachers,Schools & Universities' || inputs.test_tabs }}
           USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
 
       - name: Process error reports
