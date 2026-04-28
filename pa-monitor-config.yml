@@ -1,6 +1,6 @@
 # PA monitor configuration (pa-monitor-config.yml)
 # PA codes and page paths: keep aligned with pa-monitor-config.js (Playwright imports the JS file).
-# Tier 1 locale matrix for GitHub Actions is defined in pa-monitor-config.js → tier1Locales.
+# Tier 1 PA core matrix: pa-monitor-config.js → tier1Locales; optional per-row pageKeys (default: plans + catalog; ROW catalog-only uses ['catalog']).
 # Used by CircleCI (tier2) and as documentation for plans/teams specs.
 #
 # Phase 2 (post ROW migration): add osi_codes per locale, consolidate row_spec -> spec
@@ -11,6 +11,11 @@ pages:
     row_spec: plans/pa-core-monitor.spec.js   # ROW — same spec (override in JS monitorPages.plans.rowSpec if needed)
     us_path: /creativecloud/plans.html
     row_path: /creativecloud/plans.html
+  catalog:
+    spec: plans/pa-core-monitor.spec.js
+    row_spec: plans/pa-core-monitor.spec.js
+    us_path: /products/catalog.html
+    row_path: /products/catalog.html
   teams:
     spec: teams/monitor-core.spec.js        # TBD — align with plans approach
     row_spec: teams/monitor_row.spec.js
@@ -39,7 +44,7 @@ offer_codes:
 #       - r_JXAnlFI7xD6FxWKl2ODvZriLYBoSL701Kd1hRyhe8
 
 tiers:
-  # Tier 1 — GitHub Actions matrix comes from pa-monitor-config.js (tier1Locales). Keep this block aligned.
+  # Tier 1 — GitHub Actions matrix comes from pa-monitor-config.js (tier1Locales). US: plans+catalog; ROW below: catalog-only in JS (pageKeys).
   tier1:
     - locale: ""
       label: US

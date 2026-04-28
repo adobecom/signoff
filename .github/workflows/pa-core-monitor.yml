@@ -1,4 +1,4 @@
-name: PA Core Monitor — Plans
+name: PA Core Monitor — Plans & Catalog
 
 on:
   schedule:
@@ -160,20 +160,26 @@ jobs:
         env:
           MATRIX_LOCALE: ${{ matrix.locale }}
           MATRIX_REGION: ${{ matrix.region }}
+          MATRIX_PAGE_KEY: ${{ matrix.pageKey }}
         run: |
-          REGION="$MATRIX_REGION"
+          PAGE_KEY="${MATRIX_PAGE_KEY:-plans}"
+          echo "PA_MONITOR_PAGE_KEY=$PAGE_KEY" >> $GITHUB_ENV
 
           TEST_URL_VAL=$(node -e "
-            const { buildAdobePlansUrl } = require('./pa-monitor-config.js');
+            const { buildAdobePlansUrl, monitorPages } = require('./pa-monitor-config.js');
             const loc = process.env.MATRIX_LOCALE || '';
-            process.stdout.write(buildAdobePlansUrl(loc));
+            const key = process.env.MATRIX_PAGE_KEY || 'plans';
+            const p = monitorPages[key];
+            if (!p) throw new Error('Unknown monitor page: ' + key);
+            process.stdout.write(buildAdobePlansUrl(loc, p.path));
           ")
           echo "TEST_URL=$TEST_URL_VAL" >> $GITHUB_ENV
 
           SPEC=$(node -e "
             const { monitorPages } = require('./pa-monitor-config.js');
             const region = process.env.MATRIX_REGION;
-            const p = monitorPages.plans;
+            const key = process.env.MATRIX_PAGE_KEY || 'plans';
+            const p = monitorPages[key] || monitorPages.plans;
             const spec = region === 'us' ? p.spec : (p.rowSpec || p.spec);
             process.stdout.write(spec);
           ")
@@ -184,13 +190,14 @@ jobs:
         run: npx playwright test ${{ env.TEST_SPEC }} --project=chromium
         env:
           TEST_URL: ${{ env.TEST_URL }}
+          PA_MONITOR_PAGE_KEY: ${{ env.PA_MONITOR_PAGE_KEY }}
           USER_AGENT_SUFFIX: ${{ secrets.USER_AGENT_SUFFIX }}
 
       - name: Upload artifacts
         if: steps.should-run.outputs.skip != 'true' && !cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: pa-core-monitor-results-${{ matrix.label }}-${{ github.run_number }}
+          name: pa-core-monitor-results-${{ matrix.label }}-${{ matrix.pageKey }}-${{ github.run_number }}
           path: |
             playwright-report/
             screenshots/
@@ -202,10 +209,12 @@ jobs:
         if: steps.should-run.outputs.skip != 'true' && failure()
         id: errors
         run: |
-          if [ -f "test-results/error-report-plans.json" ]; then
+          ERR_FILE="test-results/error-report-${{ matrix.pageKey }}.json"
+          export ERR_FILE
+          if [ -f "$ERR_FILE" ]; then
             DETAIL=$(python3 -c "
-          import json, sys
-          d = json.load(open('test-results/error-report-plans.json'))
+          import json, os
+          d = json.load(open(os.environ['ERR_FILE']))
           lines = [f\"• {e}\" for e in d.get('errors', [])]
           print('\n'.join(lines[:10]))  # cap at 10 to keep Slack message readable
           if len(d.get('errors',[])) > 10:
@@ -235,7 +244,7 @@ jobs:
             "attachments": [
               {
                 "color": "danger",
-                "title": "❌ PA Core Monitor FAILED — ${{ matrix.label }} Plans",
+                "title": "❌ PA Core Monitor FAILED — ${{ matrix.label }} ${{ matrix.pageLabel }}",
                 "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}\n\n⚠️ *PA Core monitor (every 30 min UTC; scheduled runs pause 24h after a failure — run workflow manually to retry sooner). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
                 "mrkdwn_in": ["text"],
                 "footer": "adobecom/signoff"
@@ -285,7 +294,7 @@ jobs:
               attachments: [
                 {
                   color: 'good',
-                  title: '✅ PA Core Monitor RECOVERED — Plans',
+                  title: '✅ PA Core Monitor RECOVERED — Plans & Catalog',
                   text: `Previous run failed; this scheduled run succeeded.\nView run: ${runUrl}`,
                   footer: 'adobecom/signoff',
                 },

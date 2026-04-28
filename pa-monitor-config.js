@@ -25,20 +25,33 @@ const monitorPages = {
     /** Until ROW parity is proven, point ROW at a different spec here. */
     rowSpec: 'plans/pa-core-monitor.spec.js',
   },
+  catalog: {
+    id: 'catalog',
+    path: 'products/catalog.html',
+    spec: 'plans/pa-core-monitor.spec.js',
+    rowSpec: 'plans/pa-core-monitor.spec.js',
+  },
 };
 
 /**
+ * Default pages per locale row when `pageKeys` is omitted.
+ * ROW catalog-only: use pageKeys: ['catalog'] — URLs are `{locale}/products/catalog.html`.
+ */
+const paCoreMonitorPageKeys = ['plans', 'catalog'];
+
+/**
  * Tier 1 locales for the scheduled PA core monitor (see .github/workflows/pa-core-monitor.yml).
- * `region`: `us` vs `row` selects monitorPages.plans.spec vs rowSpec in workflow.
+ * `region`: `us` vs `row` selects monitorPages.*.spec vs rowSpec in workflow.
+ * `pageKeys` (optional): subset of `plans` / `catalog`; defaults to paCoreMonitorPageKeys for that row.
  */
 const tier1Locales = [
   { locale: '', label: 'US', region: 'us' },
-  // { locale: 'uk', label: 'UK', region: 'row' },
-  // { locale: 'de', label: 'DE', region: 'row' },
-  // { locale: 'fr', label: 'FR', region: 'row' },
-  // { locale: 'jp', label: 'JP', region: 'row' },
-  // { locale: 'au', label: 'AU', region: 'row' },
-  // { locale: 'in', label: 'IN', region: 'row' },
+  { locale: 'uk', label: 'UK', region: 'row', pageKeys: ['catalog'] },
+  { locale: 'fr', label: 'FR', region: 'row', pageKeys: ['catalog'] },
+  { locale: 'de', label: 'DE', region: 'row', pageKeys: ['catalog'] },
+  { locale: 'au', label: 'AU', region: 'row', pageKeys: ['catalog'] },
+  { locale: 'jp', label: 'JP', region: 'row', pageKeys: ['catalog'] },
+  { locale: 'in', label: 'IN', region: 'row', pageKeys: ['catalog'] },
 ];
 
 const ADOBE_ORIGIN = 'https://www.adobe.com';
@@ -52,16 +65,22 @@ function buildAdobePlansUrl(locale, pagePath = monitorPages.plans.path) {
   return `${ADOBE_ORIGIN}/${prefix}${pagePath}`;
 }
 
-/** Matrix rows for GitHub Actions `strategy.matrix.include`. */
-const tier1GithubActionsMatrix = tier1Locales.map(row => ({
-  locale: row.locale,
-  label: row.label,
-  region: row.region,
-}));
+/** Matrix rows for GitHub Actions `strategy.matrix.include` (locale × configured pageKeys). */
+const tier1GithubActionsMatrix = tier1Locales.flatMap(row => {
+  const keys = row.pageKeys || paCoreMonitorPageKeys;
+  return keys.map(pageKey => ({
+    locale: row.locale,
+    label: row.label,
+    region: row.region,
+    pageKey,
+    pageLabel: pageKey === 'plans' ? 'Plans' : 'Catalog',
+  }));
+});
 
 module.exports = {
   offerCodes,
   monitorPages,
+  paCoreMonitorPageKeys,
   tier1Locales,
   tier1GithubActionsMatrix,
   buildAdobePlansUrl,

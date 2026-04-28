@@ -155,6 +155,17 @@ function hrefMentionsPa(href, pa) {
   return h.includes(`pa=${pa}`) || h.includes(`&pa=${pa}`);
 }
 
+/** Ensures `georouting=off` on catalog loads (ACOM geo routing can leave CTAs disabled for automation). */
+function appendGeoroutingOff(urlString) {
+  try {
+    const u = new URL(urlString);
+    u.searchParams.set('georouting', 'off');
+    return u.href;
+  } catch {
+    return urlString;
+  }
+}
+
 /**
  * First checkout/buy control on the card whose href matches a configured PA.
  */
@@ -177,9 +188,15 @@ async function findConfiguredPaCheckout(cardLocator, codes) {
 test.describe('Creative Cloud Plans — PA core monitor', () => {
   test.describe.configure({ retries: 2 });
 
-  const testUrl =
+  const pageKey = process.env.PA_MONITOR_PAGE_KEY || 'plans';
+  const monitorPage = monitorPages[pageKey] || monitorPages.plans;
+  const errorReportName = pageKey === 'catalog' ? 'Catalog' : 'Plans';
+
+  const baseTestUrl =
     process.env.TEST_URL ||
-    buildAdobePlansUrl(process.env.TEST_LOCALE || '', monitorPages.plans.path);
+    buildAdobePlansUrl(process.env.TEST_LOCALE || '', monitorPage.path);
+  const testUrl =
+    pageKey === 'catalog' ? appendGeoroutingOff(baseTestUrl) : baseTestUrl;
 
   console.log('\n' + '='.repeat(80));
   console.log('🎯 PA CORE MONITOR (PA-scoped, monitor2 flow)');
@@ -201,6 +218,9 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
 
   test('should check price options for configured PA cards', async ({ page }) => {
     test.setTimeout(1800 * 1000);
+
+    /** Catalog merch-cards often omit inline price; pricing appears in the commerce modal only. */
+    const skipMainPagePriceChecks = pageKey === 'catalog';
 
     const plansPage = new PlansPage(page);
     try {
@@ -226,22 +246,28 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
     const cardResults = [];
     const optionResults = [];
 
-    const tabs = await plansPage.tabs.all();
+    const planTabs = await plansPage.tabs.all();
+    const tabless = planTabs.length === 0;
+    const tabCount = tabless ? 1 : planTabs.length;
 
     const ttMeta = await page.evaluate(() => window.ttMETA);
     console.log(`Target Test Campaign ttMeta:\n${JSON.stringify(ttMeta, null, 2)}`);
 
     console.log('\n' + '─'.repeat(80));
-    console.log(`📑 TABS DISCOVERY: Found ${tabs.length} tabs to test`);
+    if (tabless) {
+      console.log('📑 PAGE MODE: No #tabs-plan tabs — scanning visible merch-cards on the page');
+    } else {
+      console.log(`📑 TABS DISCOVERY: Found ${planTabs.length} tabs to test`);
+    }
     console.log('─'.repeat(80));
 
-    for (let i = 0; i < tabs.length; i++) {
+    for (let i = 0; i < tabCount; i++) {
       if (process.env.TEST_TAB && parseInt(process.env.TEST_TAB, 10) !== i) {
         console.log(`Skipping tab ${i} as TEST_TAB is set to ${process.env.TEST_TAB}`);
         continue;
       }
-      const tab = tabs[i];
-      const tabTitle = await tab.textContent();
+      const tab = tabless ? null : planTabs[i];
+      const tabTitle = tabless ? 'Page' : await tab.textContent();
 
       const tabResult = {
         tabIndex: i,
@@ -249,13 +275,19 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
         cardCount: 0,
       };
 
-      console.log(`\n  ┌─ Tab ${i + 1}/${tabs.length}: "${tabTitle}"`);
+      console.log(`\n  ┌─ ${tabless ? 'Surface' : `Tab ${i + 1}/${tabCount}`}: "${tabTitle}"`);
 
-      await tab.click();
-      await page.waitForTimeout(1000);
-      const tabPanel = await plansPage.getTabPanel(tab);
-      const merchCards = await plansPage.getMerchCards(tabPanel);
-      console.log(`  │  Found ${merchCards.length} merch card${merchCards.length !== 1 ? 's' : ''} on tab`);
+      if (!tabless) {
+        await tab.click();
+        await page.waitForTimeout(1000);
+      }
+      const tabPanel = tabless ? null : await plansPage.getTabPanel(tab);
+      const merchCards = tabless
+        ? await page.locator('merch-card').filter({ visible: true }).all()
+        : await plansPage.getMerchCards(tabPanel);
+      console.log(
+        `  │  Found ${merchCards.length} merch card${merchCards.length !== 1 ? 's' : ''} ${tabless ? 'on page' : 'on tab'}`
+      );
 
       tabResult.cardCount = merchCards.length;
 
@@ -311,9 +343,12 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
           cardResult.cardTitle = productName;
           cardResult.cardPrice = cardPrice;
 
-          if (cardPrice === 'N/A' && isCSOCritical(productName)) {
+          if (!skipMainPagePriceChecks && cardPrice === 'N/A' && isCSOCritical(productName)) {
             cardResult.error = `No price displayed for "${productName}" (Tab "${tabTitle}", Card ${j + 1})`;
             console.log(`  │  │  ⚠️  CSO-CRITICAL: No price displayed`);
+          }
+          if (skipMainPagePriceChecks && cardPrice === 'N/A') {
+            console.log(`  │  │  ⏭️  Catalog: no inline card price (expected); validating in modal/cart only`);
           }
 
           await merchCard.card.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}.png` });
@@ -340,7 +375,7 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
             } catch (err) {
               console.log('  │  │  Timeout on waiting for network idle!');
             }
-            await tabs[i].click();
+            if (!tabless) await planTabs[i].click();
             await page.waitForTimeout(1000);
             continue;
           }
@@ -400,11 +435,15 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
             }
             const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
             console.log(`  │  │     Selected: ${selectedPriceOption}`);
-            if (selectedPriceOption.replace(/[^\d.]/g, '') !== cardPrice.replace(/[^\d.]/g, '')) {
-              cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
-              console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
+            if (!skipMainPagePriceChecks) {
+              if (selectedPriceOption.replace(/[^\d.]/g, '') !== cardPrice.replace(/[^\d.]/g, '')) {
+                cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
+                console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
+              } else {
+                console.log(`  │  │     ✓ Price matches card price`);
+              }
             } else {
-              console.log(`  │  │     ✓ Price matches card price`);
+              console.log(`  │  │     ⏭️  Catalog: skipped matching modal selection to main card price`);
             }
 
             const priceOptions = await modal.priceOptions.all();
@@ -512,7 +551,7 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
             } catch (err) {
               /* continue */
             }
-            await tabs[i].click({ timeout: 10000 });
+            if (!tabless) await planTabs[i].click({ timeout: 10000 });
             await page.waitForTimeout(1000);
           } else {
             console.log(`  │  │  🔀 Redirected to: ${newUrl}`);
@@ -563,7 +602,7 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
           } catch (err) {
             /* continue */
           }
-          await tabs[i].click({ timeout: 10000 });
+          if (!tabless) await planTabs[i].click({ timeout: 10000 });
           await page.waitForTimeout(1000);
         }
 
@@ -593,8 +632,8 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
       console.log('\n' + '='.repeat(80) + '\n');
 
       const errorMessages = errorResults.map(r => r.error);
-      // Filename must stay error-report-plans.json for PA core Slack parsing (.github/workflows/pa-core-monitor.yml)
-      saveErrorReport('Plans', errorMessages, errorResults, testUrl);
+      // Filename error-report-<pageKey>.json must match pa-core-monitor.yml Slack step
+      saveErrorReport(errorReportName, errorMessages, errorResults, testUrl);
 
       expect(errorResults.length).toBe(0);
     } else {
