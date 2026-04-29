@@ -180,6 +180,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_CHANNEL: 'acom-commerce-alerts'
+          # CSO alerts always go to acom-commerce-alerts regardless of faulty mode
           SLACK_COLOR: '#FF0000'
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: 🚨 CSO Alert - Plans US Monitor
@@ -230,7 +231,9 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: ${{ github.event_name == 'schedule' && 'acom-commerce-alerts' || inputs.slack_channel_failed || 'loot-loaders-tests' }}
+          # Monitor failures always go to loot-loaders-tests.
+          # #acom-commerce-alerts is notified by the Jira pipeline only when a NEW ticket is created.
+          SLACK_CHANNEL: ${{ inputs.slack_channel_failed || 'loot-loaders-tests' }}
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Plans US Monitor 2
@@ -238,12 +241,13 @@ jobs:
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             Test URL: https://www.adobe.com/creativecloud/plans.html
+            ${{ vars.PLANS_2_FAULTY_MODE == 'true' && '⚠️ Running in FAULTY MODE - Known issue, reduced alerting' || '' }}
             ${{ steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && '🚨 **CSO Alert**: Critical products affected - see separate CSO alert above' || '' }}
-            
+
             ${{ steps.process-errors.outputs.ERROR_SUMMARY }}
-            
+
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Plans US Monitor 🇺🇸 - FAILURE${{ steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && ' 🚨 [CSO]' || '' }}
+          SLACK_TITLE: ❌ Plans US Monitor 🇺🇸 - FAILURE${{ vars.PLANS_2_FAULTY_MODE == 'true' && ' [Known Faulty]' || '' }}${{ steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && ' 🚨 [CSO]' || '' }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 

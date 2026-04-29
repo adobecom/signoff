@@ -247,6 +247,31 @@ jobs:
             test-results/
           retention-days: 30
 
+      - name: Check if locale is in faulty mode
+        id: check-faulty
+        run: |
+          # Map display name to locale code
+          case "${{ matrix.locale }}" in
+            "UK")      LOCALE_CODE="uk" ;;
+            "Japan")   LOCALE_CODE="jp" ;;
+            "Germany") LOCALE_CODE="de" ;;
+            "France")  LOCALE_CODE="fr" ;;
+            "Spain")   LOCALE_CODE="es" ;;
+            "Italy")   LOCALE_CODE="it" ;;
+            "India")   LOCALE_CODE="in" ;;
+            "Brazil")  LOCALE_CODE="br" ;;
+            *)         LOCALE_CODE="${{ matrix.locale }}" ;;
+          esac
+
+          FAULTY_LOCALES="${{ vars.TEAMS_FAULTY_LOCALES || '' }}"
+          if [ -n "$FAULTY_LOCALES" ] && echo ",$FAULTY_LOCALES," | grep -q ",$LOCALE_CODE,"; then
+            echo "is_faulty=true" >> $GITHUB_OUTPUT
+            echo "Locale ${{ matrix.locale }} ($LOCALE_CODE) is in FAULTY MODE"
+          else
+            echo "is_faulty=false" >> $GITHUB_OUTPUT
+            echo "Locale ${{ matrix.locale }} ($LOCALE_CODE) is in NORMAL MODE"
+          fi
+
       - name: Slack notification on success
         if: success()
         uses: rtCamp/action-slack-notify@v2
@@ -257,7 +282,7 @@ jobs:
           SLACK_USERNAME: Teams ROW Monitor
           SLACK_MSG_AUTHOR: ""
           MSG_MINIMAL: true
-          SLACK_TITLE: ✅ Teams ROW Monitor (${{ matrix.locale }}) - SUCCESS
+          SLACK_TITLE: ✅ Teams ROW Monitor (${{ matrix.locale }}) - SUCCESS${{ steps.check-faulty.outputs.is_faulty == 'true' && ' [Faulty Mode]' || '' }}
           SLACK_MESSAGE: |
             Test URL: ${{ env.TEST_URL }}
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -268,7 +293,9 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: ${{ github.event_name == 'schedule' && 'acom-commerce-alerts' || inputs.slack_channel_failed || 'loot-loaders-tests' }}
+          # Monitor failures always go to loot-loaders-tests.
+          # #acom-commerce-alerts is notified by the Jira pipeline only when a NEW ticket is created.
+          SLACK_CHANNEL: ${{ inputs.slack_channel_failed || 'loot-loaders-tests' }}
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Teams ROW Monitor
@@ -276,11 +303,12 @@ jobs:
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             Test URL: ${{ env.TEST_URL }}
-            
+            ${{ steps.check-faulty.outputs.is_faulty == 'true' && '⚠️ Running in FAULTY MODE - Known issue, reduced alerting' || '' }}
+
             ${{ steps.process-errors.outputs.ERROR_SUMMARY }}
-            
+
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Teams ROW Monitor (${{ matrix.locale }}) - FAILURE
+          SLACK_TITLE: ❌ Teams ROW Monitor (${{ matrix.locale }}) - FAILURE${{ steps.check-faulty.outputs.is_faulty == 'true' && ' [Known Faulty]' || '' }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 

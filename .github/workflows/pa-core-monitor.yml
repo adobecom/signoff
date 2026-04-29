@@ -307,19 +307,31 @@ jobs:
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           DETAIL="${{ steps.errors.outputs.detail }}"
-          
+
+          # Monitor failures always go to loot-loaders-tests.
+          # #acom-commerce-alerts is notified by the Jira pipeline only when a NEW ticket is created.
+          SLACK_CHANNEL="#loot-loaders-tests"
+          FAULTY_MODE="${{ vars.PA_CORE_FAULTY_MODE }}"
+          if [ "$FAULTY_MODE" = "true" ]; then
+            FAULTY_LABEL=" [Known Faulty]"
+            FAULTY_NOTE="\n⚠️ Running in FAULTY MODE - Known issue, reduced alerting."
+          else
+            FAULTY_LABEL=""
+            FAULTY_NOTE=""
+          fi
+
           curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
             -H "Content-Type: application/json" \
             -d @- <<EOF
           {
-            "channel": "#acom-commerce-alerts",
+            "channel": "${SLACK_CHANNEL}",
             "username": "PA Core Monitor",
             "icon_url": "https://github.com/actions.png?size=48",
             "attachments": [
               {
                 "color": "danger",
-                "title": "❌ PA Core Monitor FAILED — ${{ matrix.label }} ${{ matrix.pageLabel }}",
-                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}\n\n⚠️ *PA Core monitor (every 30 min UTC; scheduled runs pause 24h after a failure — run workflow manually to retry sooner). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
+                "title": "❌ PA Core Monitor FAILED${FAULTY_LABEL} — ${{ matrix.label }} ${{ matrix.pageLabel }}",
+                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}${FAULTY_NOTE}\n\n⚠️ *PA Core monitor (every 30 min UTC; scheduled runs pause 24h after a failure — run workflow manually to retry sooner). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
                 "mrkdwn_in": ["text"],
                 "footer": "adobecom/signoff"
               }

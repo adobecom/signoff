@@ -74,7 +74,9 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: acom-commerce-alerts
+          # Monitor failures always go to loot-loaders-tests.
+          # #acom-commerce-alerts is notified by the Jira pipeline only when a NEW ticket is created.
+          SLACK_CHANNEL: loot-loaders-tests
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Teams US Monitor
@@ -82,8 +84,9 @@ jobs:
           MSG_MINIMAL: true
           SLACK_MESSAGE: |
             Test URL: https://www.adobe.com/creativecloud/business/teams.html
+            ${{ vars.TEAMS_FAULTY_MODE == 'true' && '⚠️ Running in FAULTY MODE - Known issue, reduced alerting' || '' }}
             View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SLACK_TITLE: ❌ Teams US Monitor 🇺🇸 - FAILURE
+          SLACK_TITLE: ❌ Teams US Monitor 🇺🇸 - FAILURE${{ vars.TEAMS_FAULTY_MODE == 'true' && ' [Known Faulty]' || '' }}
           SLACK_FOOTER: ""
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 

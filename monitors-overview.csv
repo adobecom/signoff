@@ -1,0 +1,16 @@
+Monitor,Page(s),Products Scoped?,Status,Schedule
+PA Core,"/creativecloud/plans.html (US) | /products/catalog.html (US)","Yes — CC Pro, CC Pro Business, Photoshop, Acrobat Pro, Photography",ON,Every 30 min 24/7
+PA Core ROW,/[locale]/products/catalog.html (UK FR DE AU JP IN),"Yes — CC Pro, CC Pro Business, Photoshop, Acrobat Pro, Photography",OFF (commented out in config),—
+Plans,/creativecloud/plans.html (US),No — all,DISABLED,—
+Plans 2,/creativecloud/plans.html?martech=off (US),No — all,ON,~8x daily 11:40am–7pm EST + nights
+Plans Win/Mac,/creativecloud/plans.html (US),No — all,DISABLED,—
+Plans 2 Win/Mac,/creativecloud/plans.html?martech=off (US),No — all,ON,Once daily 1:30am UTC
+Plans 3,/creativecloud/plans.html (US),No — all,ON (manual only),Manual dispatch only
+Plans Android,/creativecloud/plans.html (US),No — all,ON (manual only),Manual dispatch only
+Plans iOS,/creativecloud/plans.html (US),No — all,ON (manual only),Manual dispatch only
+Plans ROW,/[locale]/creativecloud/plans.html (UK JP DE FR ES IT IN BR),No — all,DISABLED,—
+Plans ROW 2,/[locale]/creativecloud/plans.html (UK JP DE FR ES IT IN BR),No — all,ON,~10x daily per region (local business hours)
+Teams,/creativecloud/business/teams.html (US),No — all,ON,Twice daily 2am + 2pm UTC
+Teams ROW,/[locale]/creativecloud/business/teams.html (ROW locales),No — all,ON,16x daily across regional hours
+Page Load,Many pages from urls.yml,No — all,ON (manual only),Manual dispatch only
+Page Load 2,Many pages from urls.yml,No — all,ON (manual only),Manual dispatch only
