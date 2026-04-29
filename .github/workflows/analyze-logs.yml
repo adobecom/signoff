@@ -20,7 +20,24 @@ on:
       slack_channel_alert:
         description: 'Slack channel to send the analyze logs notification'
         required: false
-        default: "#loot-loaders-tests"
+        default: "#acom-commerce-alerts"
+        type: string
+      jira_project:
+        description: 'Jira project key (e.g. DOTCOM)'
+        required: false
+        default: 'DOTCOM'
+        type: string
+      jira_assignee:
+        description: 'Jira assignee username'
+        required: false
+        type: string
+      jira_cc:
+        description: 'Comma-separated usernames to CC on the Jira ticket'
+        required: false
+        type: string
+      jira_team:
+        description: 'Jira team field value'
+        required: false
         type: string
 
 jobs:
@@ -41,8 +58,12 @@ jobs:
             "parameters": {
               "run_url": "${RUN_URL}",
               "jira_issue_key": "${JIRA_ISSUE_KEY}",
+              "jira_project": "${{ inputs.jira_project || 'DOTCOM' }}",
+              "jira_assignee": "${{ inputs.jira_assignee }}",
+              "jira_cc": "${{ inputs.jira_cc }}",
+              "jira_team": "${{ inputs.jira_team }}",
               "slack_channel_jira": "${SLACK_CHANNEL_JIRA}",
-              "slack_channel_alert": "${SLACK_CHANNEL_ALERT}"
+              "slack_channel_alert": "${SLACK_CHANNEL_ALERT:-#acom-commerce-alerts}"
             }
           }
           EOF
