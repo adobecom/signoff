@@ -32,6 +32,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       pause_skip: ${{ steps.pause-gate.outputs.pause_skip }}
+      just_paused: ${{ steps.pause-gate.outputs.just_paused }}
     steps:
       - name: Checkout signoff repository
         uses: actions/checkout@v4
@@ -74,6 +75,10 @@ jobs:
 
             const runs = listData.workflow_runs || [];
 
+            // Track whether the immediately previous completed run had monitors that ran.
+            // Used to detect "just paused" — the first run after a failure triggers the pause.
+            let prevRunHadMonitors = false;
+
             for (const run of runs) {
               const { data: jobsData } = await github.rest.actions.listJobsForWorkflowRun({
                 owner: context.repo.owner,
@@ -89,6 +94,12 @@ jobs:
               const anyMonitorRan = monitorJobs.some(
                 j => j.status === 'completed' && j.conclusion !== 'skipped',
               );
+
+              // First loop iteration = most recent completed run
+              if (prevRunHadMonitors === false) {
+                prevRunHadMonitors = anyMonitorRan;
+              }
+
               if (!anyMonitorRan) continue;
 
               // Check job-level failures — more reliable than run.conclusion which can be
@@ -100,22 +111,45 @@ jobs:
 
               if (anyMonitorFailed) {
                 const pause = ageMs < pauseMs;
+                // just_paused=true only on the first scheduled run after the failure —
+                // i.e. the previous completed run had monitors that actually ran (it was the failure run).
+                const justPaused = pause && prevRunHadMonitors;
                 core.setOutput('pause_skip', pause ? 'true' : 'false');
+                core.setOutput('just_paused', justPaused ? 'true' : 'false');
                 core.info(
                   pause
-                    ? `Pausing schedules: monitor job failed in run ${run.id} ended ${run.updated_at}`
+                    ? `Pausing schedules: monitor job failed in run ${run.id} ended ${run.updated_at}${justPaused ? ' (first pause — will notify Slack)' : ''}`
                     : `Last failed monitor (${run.id}) is older than 24h — resume.`,
                 );
                 return;
               }
 
               core.setOutput('pause_skip', 'false');
+              core.setOutput('just_paused', 'false');
               core.info(`Last monitor run ${run.id} had no failures — not pausing.`);
               return;
             }
 
             core.setOutput('pause_skip', 'false');
+            core.setOutput('just_paused', 'false');
             core.info('No prior monitor runs found — not pausing.');
+
+      - name: Slack — Monitor paused
+        if: steps.pause-gate.outputs.just_paused == 'true'
+        run: |
+          curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "channel": "#acom-commerce-alerts",
+              "username": "PA Core Monitor",
+              "icon_url": "https://github.com/actions.png?size=48",
+              "attachments": [{
+                "color": "warning",
+                "title": "⏸️ PA Core Monitor paused for 24h",
+                "text": "A monitor failure was detected. Scheduled runs are suspended for 24 hours to reduce noise.\n\n*Run the workflow manually when you are ready to retry.*",
+                "footer": "adobecom/signoff"
+              }]
+            }'
 
   monitor:
     needs: setup
