@@ -46,12 +46,13 @@ const paCoreMonitorPageKeys = ['plans', 'catalog'];
  */
 const tier1Locales = [
   { locale: '', label: 'US', region: 'us' },
-  { locale: 'uk', label: 'UK', region: 'row', pageKeys: ['catalog'] },
-  { locale: 'fr', label: 'FR', region: 'row', pageKeys: ['catalog'] },
-  { locale: 'de', label: 'DE', region: 'row', pageKeys: ['catalog'] },
-  { locale: 'au', label: 'AU', region: 'row', pageKeys: ['catalog'] },
-  { locale: 'jp', label: 'JP', region: 'row', pageKeys: ['catalog'] },
-  { locale: 'in', label: 'IN', region: 'row', pageKeys: ['catalog'] },
+  // ROW catalog & plans disabled
+  // { locale: 'uk', label: 'UK', region: 'row', pageKeys: ['catalog'] },
+  // { locale: 'fr', label: 'FR', region: 'row', pageKeys: ['catalog'] },
+  // { locale: 'de', label: 'DE', region: 'row', pageKeys: ['catalog'] },
+  // { locale: 'au', label: 'AU', region: 'row', pageKeys: ['catalog'] },
+  // { locale: 'jp', label: 'JP', region: 'row', pageKeys: ['catalog'] },
+  // { locale: 'in', label: 'IN', region: 'row', pageKeys: ['catalog'] },
 ];
 
 const ADOBE_ORIGIN = 'https://www.adobe.com';
