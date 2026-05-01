@@ -278,7 +278,7 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
       console.log(`\n  ┌─ ${tabless ? 'Surface' : `Tab ${i + 1}/${tabCount}`}: "${tabTitle}"`);
 
       if (!tabless) {
-        await tab.click();
+        await tab.click({ timeout: 10000 });
         await page.waitForTimeout(1000);
       }
       const tabPanel = tabless ? null : await plansPage.getTabPanel(tab);
@@ -375,7 +375,7 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
             } catch (err) {
               console.log('  │  │  Timeout on waiting for network idle!');
             }
-            if (!tabless) await planTabs[i].click();
+            if (!tabless) await planTabs[i].click({ timeout: 10000 });
             await page.waitForTimeout(1000);
             continue;
           }
@@ -464,10 +464,10 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
               };
 
               const priceOption = priceOptions[k];
-              await priceOption.click();
+              await priceOption.click({ timeout: 15000 });
               await page.waitForTimeout(1000);
               await expect(modal.continueButton.first()).toBeEnabled({ timeout: 10000 });
-              await modal.continueButton.first().click();
+              await modal.continueButton.first().click({ timeout: 15000 });
               await page.waitForTimeout(5000);
 
               await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png` });
@@ -502,10 +502,10 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
               optionResults.push(optionResult);
 
               if (k === priceOptions.length - 1 && (await cartPage.itemRemoveButton.count()) > 0) {
-                await cartPage.itemRemoveButton.first().click();
+                await cartPage.itemRemoveButton.first().click({ timeout: 15000 });
                 await page.waitForTimeout(1000);
                 await expect(cartPage.confirmButton.first()).toBeVisible({ timeout: 10000 });
-                await cartPage.confirmButton.first().click();
+                await cartPage.confirmButton.first().click({ timeout: 15000 });
                 await page.waitForTimeout(1000);
                 console.log(`  │  │          Removed the item from the cart`);
                 continue;
@@ -519,7 +519,7 @@ test.describe('Creative Cloud Plans — PA core monitor', () => {
               }
 
               if (newUrl === testUrl) {
-                await checkoutLocator.click();
+                await checkoutLocator.click({ timeout: 15000 });
                 await page.waitForTimeout(5000);
                 try {
                   await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });

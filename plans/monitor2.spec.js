@@ -204,7 +204,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
       console.log(`\n  ┌─ Tab ${i + 1}/${tabs.length}: "${tabTitle}"`);
       
-      await tab.click();
+      await tab.click({ timeout: 10000 });
       await page.waitForTimeout(1000);
       const tabPanel = await plansPage.getTabPanel(tab);
       const merchCards = await plansPage.getMerchCards(tabPanel);
@@ -293,7 +293,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             } catch (err) {
               console.log('  │  │  Timeout on waiting for network idle!');
             }
-            await tabs[i].click();
+            await tabs[i].click({ timeout: 10000 });
             await page.waitForTimeout(1000);
             continue;
           }
@@ -367,10 +367,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               };
               
               const priceOption = priceOptions[k];
-              await priceOption.click();
+              await priceOption.click({ timeout: 15000 });
               await page.waitForTimeout(1000);
               await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
-              await modal.continueButton.first().click();
+              await modal.continueButton.first().click({ timeout: 15000 });
               await page.waitForTimeout(5000);
 
               await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-option-${k + 1}.png`});
@@ -403,10 +403,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               optionResults.push(optionResult);
 
               if (k === priceOptions.length - 1 && await cartPage.itemRemoveButton.count() > 0) {
-                await cartPage.itemRemoveButton.first().click();
+                await cartPage.itemRemoveButton.first().click({ timeout: 15000 });
                 await page.waitForTimeout(1000);
                 await expect(cartPage.confirmButton.first()).toBeVisible({timeout: 10000});
-                await cartPage.confirmButton.first().click();
+                await cartPage.confirmButton.first().click({ timeout: 15000 });
                 await page.waitForTimeout(1000);
                 console.log(`  │  │          Removed the item from the cart`);
                 continue;
@@ -420,7 +420,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               }
 
               if (newUrl === testUrl) {
-                await merchCard.checkoutLink.first().click();
+                await merchCard.checkoutLink.first().click({ timeout: 15000 });
                 await page.waitForTimeout(5000);
                 try {
                   await modal.priceOptions.first().waitFor({ state: 'visible', timeout: 10000 });
