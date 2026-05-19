@@ -12,7 +12,7 @@ class PlansPage {
     this.tabPanel = this.tabContent.locator('.tabpanel').filter({visible: true});
     this.modalCloseButton = page.locator('svg.close-button-modal, .dexter-CloseButton').filter({visible: true});
     this.modalIframe = page.locator('div.iframe iframe').filter({visible: true});
-    this.checkoutModal = page.locator(':is(div.ReactModalPortal .commerce-context-container, div.iframe iframe)').filter({visible: true});
+    this.checkoutModal = page.locator(':is(.ReactModal__Content--after-open iframe, div.ReactModalPortal .commerce-context-container, div.iframe iframe)').filter({visible: true}).last();
   }
 
   async getTabPanel(tab) {
@@ -46,10 +46,31 @@ class Modal {
   }
 }
 
+class Modal2 {
+  constructor(modal) {
+    this.modal = modal;
+    this.tabs = modal.locator('[role="tab"]').filter({visible: true});
+    this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
+    this.priceOptions = modal.locator('[class*="CommitmentOptionCard__commitmentOptionCard__"]').filter({visible: true});
+    this.selectedPriceOption = modal.locator('[class*="CommitmentOptionCard__commitmentOptionCard__"][data-testid="is-selected"] [data-testid="main-price"]').filter({visible: true});
+    this.selectedPriceOptionRelax = modal.locator('[class*="CommitmentOptionCard__commitmentOptionCard__"][data-testid="is-selected"] [data-testid="main-price"]').filter({visible: true});
+    this.continueButton = modal.locator('button[data-testid="primary-cta-button"]').filter({visible: true});
+    this.commerceLink = modal.locator('a[href*="commerce.adobe.com"]').filter({visible: true});
+  }
+}
+
 class PriceOption {
   constructor(option) {
     this.option = option
     this.price = option.locator('.subscription-panel-offer-price [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
+    this.priceInPromoHtml = option.locator('.subscription-panel-promo-html [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
+  }  
+}
+
+class PriceOption2 {
+  constructor(option) {
+    this.option = option
+    this.price = option.locator('[data-testid="main-price"]').filter({visible: true});
     this.priceInPromoHtml = option.locator('.subscription-panel-promo-html [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *)').filter({visible: true});
   }  
 }
@@ -330,10 +351,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             await newPage.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-new-page.png`});
             await newPage.close();
           } else if (newUrl.startsWith(testUrl)) {       
-            await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-modal.png`});
 
             await expect(plansPage.checkoutModal).toBeVisible({timeout: 10000});
             const tagName = await plansPage.checkoutModal.evaluate(el => el.tagName);
+            const title = await plansPage.checkoutModal.evaluate(el => el.title);
+            let useModal2 = false;  
             let modal = null;
             if (tagName === 'IFRAME') {
               const modalIframeSrc = await plansPage.checkoutModal.getAttribute('src');
@@ -342,11 +364,21 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 //console.log(`✗ ${cardResult.error}`);
               }            
               modal = new Modal(await plansPage.checkoutModal.contentFrame());
+              if (title.includes('Three in One')) {
+                modal = new Modal2(await plansPage.checkoutModal.contentFrame());
+                useModal2 = true;
+              }
             } else {
               modal = new Modal(plansPage.checkoutModal);
             }
 
-            const hasPriceOptions = await modal.priceOptions.count() > 0;
+            let retry = 2;
+            let hasPriceOptions = await modal.priceOptions.count();
+            while (hasPriceOptions <= 0 && retry > 0) {
+              await page.waitForTimeout(3000);
+              hasPriceOptions = await modal.priceOptions.count();
+              retry--;
+            }
 
             if (!hasPriceOptions) {
               // New modal — look for a direct commerce.adobe.com link
@@ -440,13 +472,22 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             //  cardResult.error = `Two or more prices ${prices.join(', ')} in an option found for tab \"${tabTitle}\" card \"${productName}\"`;
             //  console.log(`\n   ✗ ERROR: ${cardResult.error}`);
             //}
+            let retry = 2;
+            while (retry > 0) {
+              const selectedPriceOption = await modal.selectedPriceOptionRelax.first().textContent();
+              console.log(`   Selected Option: ${selectedPriceOption}`);
+              if (selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
+                await page.waitForTimeout(3000);
+              } else {
+                break;
+              }
+              retry--;
+            }
             const selectedPriceOption = await modal.selectedPriceOptionRelax.first().textContent();
-            console.log(`   Selected Option: ${selectedPriceOption}`);
             if (selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
               cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
               console.log(`\n   ✗ ERROR: ${cardResult.error}`);
-            }
-            
+            } 
             const priceOptions = await modal.priceOptions.all();
             const productOptionResults = [];
 
@@ -464,7 +505,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               };
               productOptionResults.push(optionResult);
 
-              const priceOption = new PriceOption(priceOptions[k]);
+              const priceOption = useModal2 ? new PriceOption2(priceOptions[k]) : new PriceOption(priceOptions[k]);
               try {
                 await priceOption.price.first().waitFor({ state: 'visible', timeout: 10000 });
                 const price = await priceOption.price.first();
@@ -483,6 +524,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 }
               }
             }
+            await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-modal.png`});
+
             console.log(`   Available Options: ${productOptionResults.map(result => result.optionTitle).join(' | ')}`);
             
             for (let k = 0; k < priceOptions.length; k++) {
@@ -495,10 +538,19 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               }
 
               const optionResult = productOptionResults[k];
-              const priceOption = new PriceOption(priceOptions[k]);
+              const priceOption = useModal2 ? new PriceOption2(priceOptions[k]) : new PriceOption(priceOptions[k]);
 
               let priceTextAgain;
               let price = null;
+              let retry = 2;
+              while (retry > 0) {
+                await priceOption.price.first().waitFor({ state: 'visible', timeout: 10000 });
+                price = await priceOption.price.first();
+                priceTextAgain = await price.textContent();
+                if (priceTextAgain === optionResult.optionTitle) break;
+                await page.waitForTimeout(3000);
+                retry--;
+              }
               try {
                 await priceOption.price.first().waitFor({ state: 'visible', timeout: 10000 });
                 price = await priceOption.price.first();

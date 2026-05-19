@@ -1,0 +1,254 @@
+name: Plans ROW Daily Monitor Milo
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Test URL (overrides locale selection)'
+        required: false
+        type: string
+      locale:
+        description: 'Locale to test'
+        required: false
+        type: choice
+        options:
+          - 'all'
+          - 'be_fr'
+          - 'ca_fr'
+          - 'ch_fr'
+          - 'fr'
+          - 'lu_fr'
+      test_tabs:
+        description: 'Test Tabs'
+        required: false
+        type: string
+      slack_channel_passed:
+        description: 'Slack channel for passed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
+      slack_channel_failed:
+        description: 'Slack channel for failed tests'
+        required: false
+        type: string
+        default: 'loot-loaders-tests'
+
+jobs:
+  filter-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      faulty_locales: ${{ steps.set-matrix.outputs.faulty_locales }}
+      has_tests: ${{ steps.set-matrix.outputs.has_tests }}
+    steps:
+      - id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            # Use the actual cron schedule that triggered this run (no time checking needed!)
+            SCHEDULE="${{ github.event.schedule }}"
+            echo "Triggered by cron schedule: $SCHEDULE"
+            
+            # Load faulty locales list (comma-separated locale codes)
+            FAULTY_LOCALES="${{ vars.PLANS_FAULTY_LOCALES || '' }}"
+            echo "Faulty locales (reduced frequency): ${FAULTY_LOCALES:-none}" >&2
+            
+            # Define reduced schedule (1x per day) for each locale code
+            declare -A REDUCED_SCHEDULES
+            REDUCED_SCHEDULES["uk"]="0 6 * * *"
+            REDUCED_SCHEDULES["jp"]="0 21 * * *"
+            REDUCED_SCHEDULES["de"]="0 5 * * *"
+            REDUCED_SCHEDULES["fr"]="0 5 * * *"
+            REDUCED_SCHEDULES["es"]="0 5 * * *"
+            REDUCED_SCHEDULES["it"]="0 5 * * *"
+            REDUCED_SCHEDULES["in"]="30 0 * * *"
+            REDUCED_SCHEDULES["br"]="0 9 * * *"
+            
+            # Helper function to check if locale is in faulty list
+            is_faulty_locale() {
+              local locale="$1"
+              if [ -z "$FAULTY_LOCALES" ]; then
+                return 1  # Not in faulty list (empty list)
+              fi
+              echo ",$FAULTY_LOCALES," | grep -q ",$locale,"
+              return $?
+            }
+            
+            # Helper function to check if locale should run at this schedule
+            should_run_locale() {
+              local locale="$1"
+              if ! is_faulty_locale "$locale"; then
+                return 0  # Not a faulty locale, always run
+              fi
+              
+              # Is a faulty locale - only run at reduced schedule
+              local reduced_sched="${REDUCED_SCHEDULES[$locale]}"
+              if [ "$SCHEDULE" = "$reduced_sched" ]; then
+                echo "  ⚠️  $locale: FAULTY MODE - Running reduced schedule (1x per day)" >&2
+                return 0
+              else
+                echo "  ⏭️  $locale: FAULTY MODE - Skipping (not in reduced schedule window)" >&2
+                return 1
+              fi
+            }
+            
+            # Build matrix by filtering locales based on fault list
+            build_matrix() {
+              local matrix='{"include":['
+              local first=true
+              
+              for item in "$@"; do
+                IFS='|' read -r url locale <<< "$item"
+                
+                if should_run_locale "$locale"; then
+                  [ "$first" = false ] && matrix+=","
+                  matrix+="{\"url\":\"$url\",\"locale\":\"$locale\"}"
+                  first=false
+                fi
+              done
+              
+              matrix+=']}'
+              echo "$matrix"
+            }
+            
+            # Map each cron schedule to its locale(s), then filter by faulty list
+            MATRIX=""
+            case "$SCHEDULE" in
+              # UK only schedules
+              "0 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "20 15 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "10 17 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "0 20 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              "30 23 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk") ;;
+              
+              # Japan only schedules
+              "0 21 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "50 0 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "40 2 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "30 4 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "20 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "10 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "0 10 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              
+              # Germany, France, Spain, Italy only schedules (all same timezone - run together)
+              "0 5 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "0 7 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "50 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "40 10 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "30 12 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "20 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "10 16 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "30 22 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              
+              # India only schedules
+              "30 0 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "20 4 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "10 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              
+              # Brazil only schedules
+              "0 9 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "50 12 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "40 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "30 16 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "20 18 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "10 20 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "0 22 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              
+              # Overlapping schedules - run multiple locales
+              "0 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "50 9 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "40 11 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "30 13 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "30 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "0 18 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
+              "0 19 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
+              "0 23 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "0 11 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "30 2 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              
+              # Default: empty matrix
+              *) MATRIX='{"include":[]}' ;;
+            esac
+            
+            echo "matrix<<EOF" >> $GITHUB_OUTPUT
+            echo "$MATRIX" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "faulty_locales=$FAULTY_LOCALES" >> $GITHUB_OUTPUT
+            
+            # Check if matrix is empty
+            if [ "$MATRIX" = '{"include":[]}' ]; then
+              echo "has_tests=false" >> $GITHUB_OUTPUT
+              echo "Generated matrix: $MATRIX (empty - all locales skipped in faulty mode)"
+            else
+              echo "has_tests=true" >> $GITHUB_OUTPUT
+              echo "Generated matrix: $MATRIX"
+            fi
+            
+          elif [ "${{ inputs.locale }}" == "all" ]; then
+            # Manual trigger with no locale: run all
+            MATRIX='{"include":[{"url":"https://www.adobe.com/uk/creativecloud/plans.html","locale":"uk"},{"url":"https://www.adobe.com/jp/creativecloud/plans.html","locale":"jp"},{"url":"https://www.adobe.com/de/creativecloud/plans.html","locale":"de"},{"url":"https://www.adobe.com/fr/creativecloud/plans.html","locale":"fr"},{"url":"https://www.adobe.com/es/creativecloud/plans.html","locale":"es"},{"url":"https://www.adobe.com/it/creativecloud/plans.html","locale":"it"},{"url":"https://www.adobe.com/in/creativecloud/plans.html","locale":"in"},{"url":"https://www.adobe.com/br/creativecloud/plans.html","locale":"br"}]}'
+            echo "matrix<<EOF" >> $GITHUB_OUTPUT
+            echo "$MATRIX" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            # Manual trigger with specific locale
+            LOCALE="${{ inputs.locale }}"
+            MATRIX="{\"include\":[{\"url\":\"https://www.adobe.com/${LOCALE}/creativecloud/plans.html\",\"locale\":\"${LOCALE}\"}]}"
+            echo "matrix<<EOF" >> $GITHUB_OUTPUT
+            echo "$MATRIX" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          fi
+
+  monitor:
+    needs: filter-matrix
+    if: ${{ needs.filter-matrix.outputs.has_tests == 'true' }}
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.filter-matrix.outputs.matrix) }}
+    env:
+      TEST_URL: ${{ github.event.inputs.test_url || matrix.url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: npm ci
+
+      - name: Run plans ROW monitor
+        run: npx playwright test plans/monitor_row_milo.spec.js --project=chromium
+        env:
+          TEST_TABS: ${{ inputs.test_tabs }}
+          # TEMP: Business tab (index 1) alerts disabled ~2026-04-21, re-enable in ~1 week
+          SKIP_TAB: ${{ github.event_name == 'schedule' && '1' || '' }}
+          USER_AGENT_SUFFIX: "${{ secrets.USER_AGENT_SUFFIX }}"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: plans-row-monitor-${{ matrix.locale }}-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+            test-results/
+          retention-days: 30
+
+
