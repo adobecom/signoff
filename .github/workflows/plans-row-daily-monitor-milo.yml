@@ -18,6 +18,8 @@ on:
           - 'ch_fr'
           - 'fr'
           - 'lu_fr'
+          - 'br'
+          - 'ca'
       test_tabs:
         description: 'Test Tabs'
         required: false
