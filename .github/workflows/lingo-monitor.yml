@@ -1,0 +1,397 @@
+name: Lingo Monitor
+
+on:
+  schedule:
+    # Every 2 hours, 24/7 (UTC).
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      locale:
+        description: 'Single locale to test (e.g. "uk", "de", "" for US). Leave empty to run all configured locales.'
+        required: false
+        type: string
+      code_branch:
+        description: 'Branch to test against'
+        required: false
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  actions: read
+
+# Only one run at a time. Pending runs queue (never cancel in-progress ones) so
+# failure() and the pause-gate both see real conclusions, not cancellations.
+concurrency:
+  group: lingo-monitor
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: [self-hosted, Linux, X64]
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      pause_skip: ${{ steps.pause-gate.outputs.pause_skip }}
+      just_paused: ${{ steps.pause-gate.outputs.just_paused }}
+    steps:
+      - name: Checkout signoff repository
+        uses: actions/checkout@v4
+        with:
+          repository: adobecom/signoff
+          ref: ${{ inputs.code_branch || 'main' }}
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Build matrix from lingo-monitor-config.js
+        id: set-matrix
+        run: |
+          MATRIX=$(node -e "const { tier1GithubActionsMatrix } = require('./lingo-monitor-config.js'); process.stdout.write(JSON.stringify(tier1GithubActionsMatrix));")
+          echo "matrix<<MATRIX_EOF" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "MATRIX_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Pause gate — scheduled runs skip 24h after a failed monitor; manual always runs
+        id: pause-gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.setOutput('pause_skip', 'false');
+              core.info('Manual run — never pause.');
+              return;
+            }
+
+            const workflowId = 'lingo-core-monitor.yml';
+            const branch = context.ref.replace('refs/heads/', '');
+            const pauseMs = 24 * 60 * 60 * 1000;
+
+            const { data: listData } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflowId,
+              branch,
+              status: 'completed',
+              per_page: 30,
+            });
+
+            const runs = listData.workflow_runs || [];
+
+            // Track whether the immediately previous completed run had monitors that ran.
+            // Used to detect "just paused" — the first run after a failure triggers the pause.
+            let prevRunHadMonitors = false;
+
+            for (const run of runs) {
+              const { data: jobsData } = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              });
+
+              const monitorJobs = jobsData.jobs.filter(j => j.name.toLowerCase().startsWith('monitor'));
+              if (monitorJobs.length === 0) continue;
+
+              // Only consider runs where at least one monitor job actually completed (not just skipped)
+              const anyMonitorRan = monitorJobs.some(
+                j => j.status === 'completed' && j.conclusion !== 'skipped',
+              );
+
+              // First loop iteration = most recent completed run
+              if (prevRunHadMonitors === false) {
+                prevRunHadMonitors = anyMonitorRan;
+              }
+
+              if (!anyMonitorRan) continue;
+
+              // Check job-level failures — more reliable than run.conclusion which can be
+              // 'cancelled' when concurrency cancels a run mid-flight.
+              const anyMonitorFailed = monitorJobs.some(j => j.conclusion === 'failure');
+
+              const ended = new Date(run.updated_at).getTime();
+              const ageMs = Date.now() - ended;
+
+              if (anyMonitorFailed) {
+                const pause = ageMs < pauseMs;
+                // just_paused=true only on the first scheduled run after the failure —
+                // i.e. the previous completed run had monitors that actually ran (it was the failure run).
+                const justPaused = pause && prevRunHadMonitors;
+                core.setOutput('pause_skip', pause ? 'true' : 'false');
+                core.setOutput('just_paused', justPaused ? 'true' : 'false');
+                core.info(
+                  pause
+                    ? `Pausing schedules: monitor job failed in run ${run.id} ended ${run.updated_at}${justPaused ? ' (first pause — will notify Slack)' : ''}`
+                    : `Last failed monitor (${run.id}) is older than 24h — resume.`,
+                );
+                return;
+              }
+
+              core.setOutput('pause_skip', 'false');
+              core.setOutput('just_paused', 'false');
+              core.info(`Last monitor run ${run.id} had no failures — not pausing.`);
+              return;
+            }
+
+            core.setOutput('pause_skip', 'false');
+            core.setOutput('just_paused', 'false');
+            core.info('No prior monitor runs found — not pausing.');
+
+      - name: Slack — Monitor paused
+        if: steps.pause-gate.outputs.just_paused == 'true'
+        run: |
+          curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "channel": "#acom-commerce-alerts",
+              "username": "Lingo Monitor",
+              "icon_url": "https://github.com/actions.png?size=48",
+              "attachments": [{
+                "color": "warning",
+                "title": "⏸️ Lingo Monitor paused for 24h",
+                "text": "A monitor failure was detected. Scheduled runs are suspended for 24 hours to reduce noise.\n\n*Run the workflow manually when you are ready to retry.*",
+                "footer": "adobecom/signoff"
+              }]
+            }'
+
+  monitor:
+    needs: setup
+    if: needs.setup.outputs.pause_skip != 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+    strategy:
+      fail-fast: false  # all locales run even if one fails
+      matrix:
+        include: ${{ fromJson(needs.setup.outputs.matrix) }}
+
+    steps:
+      - name: Checkout signoff repository
+        uses: actions/checkout@v4
+        with:
+          repository: adobecom/signoff
+          ref: ${{ inputs.code_branch || 'main' }}
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Skip matrix entries if a specific locale was requested via workflow_dispatch
+      - name: Check if this locale should run
+        id: should-run
+        run: |
+          INPUT_LOCALE="${{ inputs.locale }}"
+          THIS_LOCALE="${{ matrix.locale }}"
+          if [ -n "$INPUT_LOCALE" ] && [ "$INPUT_LOCALE" != "$THIS_LOCALE" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache node_modules
+        if: steps.should-run.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        if: steps.should-run.outputs.skip != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Set TEST_URL and TEST_SPEC from lingo-monitor-config.js
+        if: steps.should-run.outputs.skip != 'true'
+        env:
+          MATRIX_LOCALE: ${{ matrix.locale }}
+          MATRIX_REGION: ${{ matrix.region }}
+          MATRIX_PAGE_KEY: ${{ matrix.pageKey }}
+        run: |
+          PAGE_KEY="${MATRIX_PAGE_KEY:-plans}"
+          echo "PA_MONITOR_PAGE_KEY=$PAGE_KEY" >> $GITHUB_ENV
+
+          TEST_URL_VAL=$(node -e "
+            const { buildAdobePlansUrl, monitorPages } = require('./lingo-monitor-config.js');
+            const loc = process.env.MATRIX_LOCALE || '';
+            const key = process.env.MATRIX_PAGE_KEY || 'plans';
+            const p = monitorPages[key];
+            if (!p) throw new Error('Unknown monitor page: ' + key);
+            process.stdout.write(buildAdobePlansUrl(loc, p.path));
+          ")
+          echo "TEST_URL=$TEST_URL_VAL" >> $GITHUB_ENV
+
+          SPEC=$(node -e "
+            const { monitorPages } = require('./lingo-monitor-config.js');
+            const region = process.env.MATRIX_REGION;
+            const key = process.env.MATRIX_PAGE_KEY || 'plans';
+            const p = monitorPages[key] || monitorPages.plans;
+            const spec = region === 'us' ? p.spec : (p.rowSpec || p.spec);
+            process.stdout.write(spec);
+          ")
+          echo "TEST_SPEC=$SPEC" >> $GITHUB_ENV
+
+      - name: Run monitor
+        if: steps.should-run.outputs.skip != 'true'
+        run: npx playwright test ${{ env.TEST_SPEC }} --project=chromium
+        env:
+          TEST_URL: ${{ env.TEST_URL }}
+          PA_MONITOR_PAGE_KEY: ${{ env.PA_MONITOR_PAGE_KEY }}
+          USER_AGENT_SUFFIX: ${{ secrets.USER_AGENT_SUFFIX }}
+
+      - name: Upload artifacts
+        if: steps.should-run.outputs.skip != 'true' && !cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lingo-monitor-results-${{ matrix.label }}-${{ matrix.pageKey }}-${{ github.run_number }}
+          path: |
+            playwright-report/
+            screenshots/
+            test-results/
+          retention-days: 14
+
+      # ── Slack: failure only — success is silent to avoid noise on scheduled cadence
+      - name: Parse error report
+        if: steps.should-run.outputs.skip != 'true' && failure()
+        id: errors
+        run: |
+          ERR_FILE="test-results/error-report-${{ matrix.pageKey }}.json"
+          export ERR_FILE
+          if [ -f "$ERR_FILE" ]; then
+            DETAIL=$(python3 -c "
+          import json, os
+          d = json.load(open(os.environ['ERR_FILE']))
+          lines = [f\"• {e}\" for e in d.get('errors', [])]
+          print('\n'.join(lines[:10]))  # cap at 10 to keep Slack message readable
+          if len(d.get('errors',[])) > 10:
+              print(f\"... and {len(d['errors']) - 10} more. See CI artifacts for full report.\")
+          ")
+            # Escape newlines for use in later steps
+            echo "detail<<EOF" >> $GITHUB_OUTPUT
+            echo "$DETAIL" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "detail=No structured error report found — check CI logs." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compute Jira routing
+        if: steps.should-run.outputs.skip != 'true' && failure()
+        id: jira-routing
+        env:
+          MATRIX_LOCALE: ${{ matrix.locale }}
+        run: |
+          node -e "
+            const { getJiraRouting } = require('./jira-routing.js');
+            const r = getJiraRouting(process.env.TEST_URL, process.env.MATRIX_LOCALE);
+            if (!r) {
+              console.log('assignee=');
+              console.log('cc=');
+              console.log('team=');
+              console.log('project=DOTCOM');
+            } else {
+              console.log('assignee=' + r.assignee);
+              console.log('cc=' + r.cc);
+              console.log('team=' + r.team);
+              console.log('project=' + r.project);
+            }
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch log analysis workflow
+        if: steps.should-run.outputs.skip != 'true' && failure()
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/analyze-logs.yml/dispatches \
+            -d "{\"ref\":\"${{ github.ref_name }}\",\"inputs\":{\"run_url\":\"${RUN_URL}\",\"jira_issue_key\":\"\",\"jira_project\":\"${{ steps.jira-routing.outputs.project }}\",\"jira_assignee\":\"${{ steps.jira-routing.outputs.assignee }}\",\"jira_cc\":\"${{ steps.jira-routing.outputs.cc }}\",\"jira_team\":\"${{ steps.jira-routing.outputs.team }}\",\"slack_channel_jira\":\"#acom-commerce-alerts\",\"slack_channel_alert\":\"#acom-commerce-alerts\"}}"
+
+      - name: Slack — Failure + CSO recommendation
+        if: steps.should-run.outputs.skip != 'true' && failure()
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          DETAIL="${{ steps.errors.outputs.detail }}"
+
+          # Monitor failures always go to loot-loaders-tests.
+          # #acom-commerce-alerts is notified by the Jira pipeline only when a NEW ticket is created.
+          SLACK_CHANNEL="#loot-loaders-tests"
+          FAULTY_MODE="${{ vars.PA_CORE_FAULTY_MODE }}"
+          if [ "$FAULTY_MODE" = "true" ]; then
+            FAULTY_LABEL=" [Known Faulty]"
+            FAULTY_NOTE="\n⚠️ Running in FAULTY MODE - Known issue, reduced alerting."
+          else
+            FAULTY_LABEL=""
+            FAULTY_NOTE=""
+          fi
+
+          curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "channel": "${SLACK_CHANNEL}",
+            "username": "Lingo Monitor",
+            "icon_url": "https://github.com/actions.png?size=48",
+            "attachments": [
+              {
+                "color": "danger",
+                "title": "❌ Lingo Monitor FAILED${FAULTY_LABEL} — ${{ matrix.label }} ${{ matrix.pageLabel }}",
+                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}${FAULTY_NOTE}\n\n⚠️ *Lingo monitor (every 30 min UTC; scheduled runs pause 24h after a failure — run workflow manually to retry sooner). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
+                "mrkdwn_in": ["text"],
+                "footer": "adobecom/signoff"
+              }
+            ]
+          }
+          EOF
+
+  # One Slack when scheduled monitors succeed after a failed completed run (avoids N matrix posts).
+  recovery-slack:
+    runs-on: ubuntu-latest
+    needs: [setup, monitor]
+    if: >-
+      always() &&
+      needs.setup.outputs.pause_skip != 'true' &&
+      needs.monitor.result == 'success' &&
+      github.event_name == 'schedule'
+    steps:
+      - name: Slack — Recovery (only if previous completed run failed)
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        with:
+          script: |
+            const workflowId = 'lingo-monitor.yml';
+            const branch = context.ref.replace('refs/heads/', '');
+            const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflowId,
+              branch,
+              status: 'completed',
+              per_page: 5,
+            });
+            const prev = (data.workflow_runs || [])[0];
+            if (!prev || prev.conclusion !== 'failure') {
+              core.info('No recovery Slack — previous completed run was not a failure.');
+              return;
+            }
+
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const payload = {
+              channel: '#acom-commerce-alerts',
+              username: 'Lingo Monitor',
+              icon_url: 'https://github.com/actions.png?size=48',
+              attachments: [
+                {
+                  color: 'good',
+                  title: '✅ Lingo Monitor RECOVERED — Plans & Catalog',
+                  text: `Previous run failed; this scheduled run succeeded.\nView run: ${runUrl}`,
+                  footer: 'adobecom/signoff',
+                },
+              ],
+            };
+
+            const res = await fetch(process.env.SLACK_WEBHOOK, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+              core.warning(`Slack webhook HTTP ${res.status}`);
+            }

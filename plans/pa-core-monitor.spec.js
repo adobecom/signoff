@@ -60,7 +60,7 @@ class CartPage {
   constructor(page) {
     this.page = page;
     this.cartTotal = page
-      .locator('[class*="CartTotals__total-amount-plus-tax"] [data-testid="price-full-display"]')
+      .locator(':is([class*="CartTotals__total-amount-plus-tax"],[data-testid="advanced-cart-order-totals-row"]) [data-testid="price-full-display"]')
       .filter({ visible: true });
     this.itemRemoveButton = page.locator('[data-testid="cart-item-remove-btn"]').filter({ visible: true });
     this.confirmButton = page.locator('[data-testid="modal"] [data-variant="primary"]').filter({ visible: true });
