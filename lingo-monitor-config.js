@@ -66,7 +66,7 @@ const tier1Locales = [
   // { locale: 'in', label: 'IN', region: 'row', pageKeys: ['catalog'] },
 ];
 
-const ADOBE_ORIGIN = 'https://www.stage.adobe.com';
+const ADOBE_ORIGIN = 'https://www.adobe.com';
 
 /**
  * @param {string} locale - '' for US
