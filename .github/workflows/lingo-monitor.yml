@@ -60,7 +60,7 @@ jobs:
               return;
             }
 
-            const workflowId = 'lingo-core-monitor.yml';
+            const workflowId = 'lingo-monitor.yml';
             const branch = context.ref.replace('refs/heads/', '');
             const pauseMs = 24 * 60 * 60 * 1000;
 
@@ -331,7 +331,7 @@ jobs:
               {
                 "color": "danger",
                 "title": "❌ Lingo Monitor FAILED${FAULTY_LABEL} — ${{ matrix.label }} ${{ matrix.pageLabel }}",
-                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}${FAULTY_NOTE}\n\n⚠️ *Lingo monitor (every 30 min UTC; scheduled runs pause 24h after a failure — run workflow manually to retry sooner). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
+                "text": "URL: ${{ env.TEST_URL }}\n\n${DETAIL}${FAULTY_NOTE}\n\n⚠️ *Lingo monitor (every 2h UTC; scheduled runs pause 24h after a failure — run workflow manually to retry sooner). If pricing or CTAs are affected, consider opening a CSO.*\n\nView run: ${RUN_URL}",
                 "mrkdwn_in": ["text"],
                 "footer": "adobecom/signoff"
               }
