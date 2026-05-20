@@ -30,8 +30,8 @@ class Modal {
     this.modal = modal;
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
-    this.priceOptions = modal.locator('.subscription-panel-offer-price').filter({visible: true});
-    this.continueButton = modal.locator('.spectrum-Button--cta').filter({visible: true});
+    this.priceOptions = modal.locator('[class*="CommitmentOptionCard__commitmentOptionCard__"] [data-testid="main-price"]').filter({visible: true});
+    this.continueButton = modal.locator('[data-testid="primary-cta-button"]').filter({visible: true});
     this.twpContinueButton = modal.locator('.twp-Continue--btn').filter({visible: true});
   }
 }
@@ -262,9 +262,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           try {
             await modal.selectedTab.first().waitFor({state: 'visible', timeout: 10000});
-            const tabTestId = await modal.selectedTab.first().getAttribute('data-query-value')
+            const tabTestId = await modal.selectedTab.first().getAttribute('data-testid')
             console.log(`         → Modal tab: ${tabTestId}`);
-            const isBusinessTab = tabTestId === 'team';
+            const isBusinessTab = tabTestId === 'segmentation-tab-item-TEAM_COM';
             if (!isBusinessTab) {
               console.log(`         ⚠️  Not a business tab\n`);
               cardErrors.push({
