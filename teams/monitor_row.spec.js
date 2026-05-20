@@ -30,8 +30,8 @@ class Modal {
     this.modal = modal;
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
-    this.priceOptions = modal.locator('[class*="CommitmentOptionCard__commitmentOptionCard__"] [data-testid="main-price"]').filter({visible: true});
-    this.continueButton = modal.locator('[data-testid="primary-cta-button"]').filter({visible: true});
+    this.priceOptions = modal.locator(':is(.subscription-panel-offer-price, [class*="CommitmentOptionCard__commitmentOptionCard__"] [data-testid="main-price"])').filter({visible: true});
+    this.continueButton = modal.locator(':is(.spectrum-Button--cta, [data-testid="primary-cta-button"])').filter({visible: true});
     this.twpContinueButton = modal.locator('.twp-Continue--btn').filter({visible: true});
   }
 }
@@ -262,9 +262,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
           try {
             await modal.selectedTab.first().waitFor({state: 'visible', timeout: 10000});
-            const tabTestId = await modal.selectedTab.first().getAttribute('data-testid')
+            const tabTestId = await modal.selectedTab.first().getAttribute('data-query-value') || await modal.selectedTab.first().getAttribute('data-testid')
             console.log(`         → Modal tab: ${tabTestId}`);
-            const isBusinessTab = tabTestId === 'segmentation-tab-item-TEAM_COM';
+            const isBusinessTab = ['team', 'segmentation-tab-item-TEAM_COM'].includes(tabTestId);
             if (!isBusinessTab) {
               console.log(`         ⚠️  Not a business tab\n`);
               cardErrors.push({
