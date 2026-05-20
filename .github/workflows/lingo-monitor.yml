@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       pause_skip: ${{ steps.pause-gate.outputs.pause_skip }}
@@ -154,9 +154,7 @@ jobs:
   monitor:
     needs: setup
     if: needs.setup.outputs.pause_skip != 'true'
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.56.0-noble
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false  # all locales run even if one fails
       matrix:
