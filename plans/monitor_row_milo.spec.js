@@ -39,10 +39,11 @@ class Modal {
     this.modal = modal;
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
-    this.priceOptions = modal.locator('div[data-testid="main-price"]').filter({visible: true});
-    this.selectedPriceOption = modal.locator('[data-testid="is-selected"] div[data-testid="main-price"]').filter({visible: true});
-    this.continueButton = modal.locator('button[data-testid="primary-cta-button"]').filter({visible: true});
+    this.priceOptions = modal.locator(':is(.subscription-panel-offer-price, [class*="CommitmentOptionCard__commitmentOptionCard__"] [data-testid="main-price"])').filter({visible: true});
+    this.selectedPriceOption = modal.locator(':is(input[checked]+label :is(.subscription-panel-offer-price,.subscription-panel-promo-html) [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *), [data-testid="is-selected"] div[data-testid="main-price"])').filter({visible: true});
+    this.continueButton = modal.locator(':is(.spectrum-Button--cta, button[data-testid="primary-cta-button"])').filter({visible: true});
     this.modalCloseButton = modal.locator('[data-testid="header-close"]').filter({visible: true});
+    this.commerceLink = modal.locator('a[href*="commerce.adobe.com"]').filter({visible: true});
   }
 }
 
@@ -384,6 +385,17 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             const hasPriceOptions = await modal.priceOptions.count() > 0;
 
             if (!hasPriceOptions) {
+              // New modal — look for a direct commerce.adobe.com link
+              console.log(`   ℹ No subscription-panel-offer found for "${productName}" — checking for commerce link (new modal)`);
+              let commerceHref = null;
+              try {
+                await modal.commerceLink.first().waitFor({ state: 'visible', timeout: 10000 });
+                commerceHref = await modal.commerceLink.first().getAttribute('href');
+              } catch (error) {
+                cardResult.error = `No price options or commerce link found in modal for "${productName}" (Tab "${tabTitle}")`;
+                console.log(`❌ ${cardResult.error}`);
+              }
+
               if (commerceHref) {
                 console.log(`  │  │     Commerce link: ${commerceHref}`);
                 await page.goto(commerceHref, { waitUntil: 'networkidle', timeout: 20000 });
