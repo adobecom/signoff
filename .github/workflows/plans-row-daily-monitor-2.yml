@@ -105,7 +105,15 @@ on:
     - cron: '30 13 * * *' # India 7:00 PM
     - cron: '30 14 * * *' # India 8:00 PM
     - cron: '0 18 * * *'  # India 11:30 PM
-    
+
+    # France/Milo (Paris, UTC+1): twice a day
+    - cron: '30 7 * * *'  # France 8:30 AM
+    - cron: '0 15 * * *'  # France 4:00 PM
+
+    # Brazil/Milo (Brasília, UTC-3): twice a day
+    - cron: '50 12 * * *' # Brazil 9:50 AM
+    - cron: '10 20 * * *' # Brazil 5:10 PM
+
   workflow_dispatch:
     inputs:
       test_url:
@@ -245,10 +253,11 @@ jobs:
             REDUCED_SCHEDULES["uk"]="0 6 * * *"
             REDUCED_SCHEDULES["jp"]="0 21 * * *"
             REDUCED_SCHEDULES["de"]="0 5 * * *"
-            REDUCED_SCHEDULES["fr"]="0 5 * * *"
+            REDUCED_SCHEDULES["fr"]="30 7 * * *"
             REDUCED_SCHEDULES["es"]="0 5 * * *"
             REDUCED_SCHEDULES["it"]="0 5 * * *"
             REDUCED_SCHEDULES["in"]="30 0 * * *"
+            REDUCED_SCHEDULES["br"]="50 12 * * *"
             
             # Helper function to check if locale is in faulty list
             is_faulty_locale() {
@@ -330,7 +339,15 @@ jobs:
               "30 0 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               "20 4 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               "10 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
-              
+
+              # France/Milo only schedules
+              "30 7 * * *") MATRIX=$(build_matrix "https://www.adobe.com/fr/creativecloud/plans.html|fr") ;;
+              "0 15 * * *") MATRIX=$(build_matrix "https://www.adobe.com/fr/creativecloud/plans.html|fr") ;;
+
+              # Brazil/Milo only schedules
+              "50 12 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "10 20 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+
               # Overlapping schedules - run multiple locales
               "0 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               "50 9 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
@@ -411,7 +428,15 @@ jobs:
           command: npm ci
 
       - name: Run plans ROW monitor
-        run: npx playwright test plans/monitor_row2.spec.js --project=chromium
+        run: |
+          LOCALE="${{ matrix.locale }}"
+          MILO_LOCALES="fr br ca be_fr be_en be_nl ca_fr ch_fr lu_fr lu_de lu_en"
+          if echo " $MILO_LOCALES " | grep -q " $LOCALE "; then
+            SPEC="plans/monitor_row_milo.spec.js"
+          else
+            SPEC="plans/monitor_row2.spec.js"
+          fi
+          npx playwright test "$SPEC" --project=chromium
         env:
           TEST_TABS: ${{ inputs.test_tabs }}
           # TEMP: Business tab (index 1) alerts disabled ~2026-04-21, re-enable in ~1 week

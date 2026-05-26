@@ -20,7 +20,7 @@ The `/plans` folder contains specialized monitoring scripts for Adobe Creative C
 - Scheduled locales: `uk`, `jp`, `de`, `es`, `it`, `in`
 - All supported locales (manual dispatch):
   `ae_ar`, `ae_en`, `africa`, `ar`, `at`, `au`,
-  `be_en`, `be_nl`, `bg`,
+  `bg`,
   `ch_de`, `ch_it`, `cl`, `cn`, `co`, `cr`, `cz`,
   `de`, `dk`,
   `ec`, `ee`, `eg_ar`, `eg_en`, `es`,
@@ -30,7 +30,7 @@ The `/plans` folder contains specialized monitoring scripts for Adobe Creative C
   `id_en`, `id_id`, `ie`, `il_en`, `il_he`, `in`, `in_hi`, `it`,
   `jp`,
   `kr`, `kw_ar`, `kw_en`,
-  `la`, `lt`, `lu_de`, `lu_en`, `lv`,
+  `la`, `lt`, `lv`,
   `mena_ar`, `mena_en`, `mx`, `my_en`, `my_ms`,
   `ng`, `nl`, `no`, `nz`,
   `pe`, `ph_en`, `ph_fil`, `pl`, `pr`, `pt`,
@@ -44,7 +44,7 @@ The `/plans` folder contains specialized monitoring scripts for Adobe Creative C
 
 ### 3. monitor_row_milo.spec.js — ROW (Milo locales)
 - Tests ROW locales hosted on the **Milo** platform
-- Locales: `fr`, `br`, `ca`, `be_fr`, `ca_fr`, `ch_fr`, `lu_fr`
+- Locales: `fr`, `br`, `ca`, `be_fr`, `be_en`, `be_nl`, `ca_fr`, `ch_fr`, `lu_fr`, `lu_de`, `lu_en`
 - Uses Milo selectors (e.g. `div#page-load-ok-milo`, `merch-card`)
 - Workflow: `plans-row-daily-monitor-milo.yml`
 
