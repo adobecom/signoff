@@ -249,7 +249,6 @@ jobs:
             REDUCED_SCHEDULES["es"]="0 5 * * *"
             REDUCED_SCHEDULES["it"]="0 5 * * *"
             REDUCED_SCHEDULES["in"]="30 0 * * *"
-            REDUCED_SCHEDULES["br"]="0 9 * * *"
             
             # Helper function to check if locale is in faulty list
             is_faulty_locale() {
@@ -332,15 +331,6 @@ jobs:
               "20 4 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               "10 6 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               
-              # Brazil only schedules
-              "0 9 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "50 12 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "40 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "30 16 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "20 18 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "10 20 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "0 22 * * *") MATRIX=$(build_matrix "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              
               # Overlapping schedules - run multiple locales
               "0 8 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               "50 9 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
@@ -349,9 +339,9 @@ jobs:
               "30 14 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               "0 18 * * *") MATRIX=$(build_matrix "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it" "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               "0 19 * * *") MATRIX=$(build_matrix "https://www.adobe.com/uk/creativecloud/plans.html|uk" "https://www.adobe.com/de/creativecloud/plans.html|de" "https://www.adobe.com/fr/creativecloud/plans.html|fr" "https://www.adobe.com/es/creativecloud/plans.html|es" "https://www.adobe.com/it/creativecloud/plans.html|it") ;;
-              "0 23 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "0 11 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
-              "30 2 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in" "https://www.adobe.com/br/creativecloud/plans.html|br") ;;
+              "0 23 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "0 11 * * *") MATRIX=$(build_matrix "https://www.adobe.com/jp/creativecloud/plans.html|jp") ;;
+              "30 2 * * *") MATRIX=$(build_matrix "https://www.adobe.com/in/creativecloud/plans.html|in") ;;
               
               # Default: empty matrix
               *) MATRIX='{"include":[]}' ;;
