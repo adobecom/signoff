@@ -106,18 +106,6 @@ on:
     - cron: '30 14 * * *' # India 8:00 PM
     - cron: '0 18 * * *'  # India 11:30 PM
     
-    # Brazil (Brasília, UTC-3): 6am, 8am, 9:50am, 11:40am, 1:30pm, 3:20pm, 5:10pm, 7pm, 8pm, 11:30pm local
-    - cron: '0 9 * * *'   # Brazil 6:00 AM
-    - cron: '0 11 * * *'  # Brazil 8:00 AM
-    - cron: '50 12 * * *' # Brazil 9:50 AM
-    - cron: '40 14 * * *' # Brazil 11:40 AM
-    - cron: '30 16 * * *' # Brazil 1:30 PM
-    - cron: '20 18 * * *' # Brazil 3:20 PM
-    - cron: '10 20 * * *' # Brazil 5:10 PM
-    - cron: '0 22 * * *'  # Brazil 7:00 PM
-    - cron: '0 23 * * *'  # Brazil 8:00 PM
-    - cron: '30 2 * * *'  # Brazil 11:30 PM
-
   workflow_dispatch:
     inputs:
       test_url:
