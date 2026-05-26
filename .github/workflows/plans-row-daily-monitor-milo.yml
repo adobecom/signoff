@@ -1,6 +1,13 @@
 name: Plans ROW Daily Monitor Milo
 
 on:
+  schedule:
+    # fr (twice a day, runs with de/es/it)
+    - cron: '0 7 * * *'    # 9am CET
+    - cron: '20 14 * * *'  # 4:20pm CET
+    # br (twice a day)
+    - cron: '50 12 * * *'  # 9:50am BRT
+    - cron: '10 20 * * *'  # 5:10pm BRT
   workflow_dispatch:
     inputs:
       test_url:
