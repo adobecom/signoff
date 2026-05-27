@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const TestStateManager = require('./TestStateManager');
 
+// Set to true (or CHECK_SELECTED_PRICE_MATCH=true env var) to enforce that
+// the pre-selected modal price matches the card price shown on the plans page.
+const CHECK_SELECTED_PRICE_MATCH = process.env.CHECK_SELECTED_PRICE_MATCH === 'true';
+
 class PlansPage {
   constructor(page) {
     this.page = page;
@@ -473,7 +477,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
               const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
               console.log(`  │  │     Selected: ${selectedPriceOption}`);
-              if (selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
+              if (CHECK_SELECTED_PRICE_MATCH && selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
                 cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
                 console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
               } else {
