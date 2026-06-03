@@ -91,11 +91,12 @@ async function gobackTabModal(page,url, tab, merchCard) {
   try {
     await page.context().clearCookies();;
     await page.evaluate(async () => { await localStorage.clear(); await sessionStorage.clear(); });
+    await page.waitForTimeout(1000);
     await page.goto(url, { waitUntil: 'networkidle', timeout: 20000, referer: undefined });
-    await page.waitForTimeout(2000);
   } catch (err) {
-    console.log(`❌ Error resetting browser context: ${err.message}`);
+    console.log(`Resetting browser context: ${err.message}`);
   }
+  await page.waitForTimeout(2000);
   await tab.click({ timeout: 10000 });
   if (merchCard) {
     await merchCard.card.waitFor({ state: 'visible', timeout: 10000 });
@@ -365,6 +366,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             continue;
           }
 
+          const [normalizedTestUrl] = testUrl.split('?', 1);
+
           if (newPage) {
             const newPageUrl = newPage.url();
             console.log(`  │  │  🔗 New page opened`);
@@ -372,7 +375,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
             await newPage.waitForTimeout(5000);
             await newPage.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-new-page.png` });
             await newPage.close();
-          } else if (newUrl.startsWith(testUrl)) {
+          } else if (newUrl.startsWith(normalizedTestUrl)) {
             console.log(`  │  │  🎭 Modal opened`);
             await page.screenshot({ path: `screenshots/plans-tab-${i + 1}-card-${j + 1}-modal.png` });
 
