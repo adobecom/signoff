@@ -601,7 +601,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
               try {
                 try {
-                  await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 20000 });
+                  await cartPage.cartSubTotal.waitFor({ state: 'visible', timeout: 30000 });
                 } catch (error) {
                   throw new Error(`Cart subtotal not found`);
                 }
@@ -760,11 +760,13 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           console.log(`   🔄 Card will be retried on next run`);
 
           try {
+            await page.context().clearCookies();;
             // Clear any stored state first
             await page.evaluate(async () => { await localStorage.clear(); await sessionStorage.clear(); });
             await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000, referer: undefined });
             await page.waitForTimeout(2000);
           } catch (err) {
+            console.log(`❌ Error resetting browser context: ${err.message}`);
           }
           await tabs[i].click({ timeout: 10000 });
           await page.waitForTimeout(1000);

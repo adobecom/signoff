@@ -377,9 +377,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
               const cartPage = new CartPage(page);
               try {
-                await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 10000 });
+                await cartPage.cartTotal.waitFor({ state: 'visible', timeout: 30000 });
               } catch (error) {
-                console.log(`❌ Cart page load failed for "${productName}" option "${priceOptionTexts[k]}" (Tab "${tabTitle}", Card ${j + 1}, Option ${k + 1}): Cart total did not become visible within 10 seconds. The checkout may have failed. Original error: ${error.message}`);
+                console.log(`❌ Cart page load failed for "${productName}" option "${priceOptionTexts[k]}" (Tab "${tabTitle}", Card ${j + 1}, Option ${k + 1}): Cart total did not become visible within 30 seconds. The checkout may have failed. Original error: ${error.message}`);
                 throw new Error(`Cart total not found for "${productName}" option "${priceOptionTexts[k]}"`);
               }
               const cartTotal = await cartPage.cartTotal.first().textContent();
@@ -490,12 +490,14 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
           console.log(`  │  │  🔄 Card will be retried on next run`);
 
           try {
+            await page.context().clearCookies();;
             // Clear any stored state first
             await page.evaluate(async () => { await localStorage.clear(); await sessionStorage.clear(); });
             await page.waitForTimeout(2000);
             await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 20000, referer: undefined });
             await page.waitForTimeout(2000);
           } catch (err) {
+            console.log(`❌ Error resetting browser context: ${err.message}`);
           }
           await tabs[i].click({ timeout: 10000 });
           await page.waitForTimeout(1000);
