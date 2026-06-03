@@ -480,8 +480,20 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 throw new Error(`Selected price option not found for "${productName}"`);
               }
 
+              // if the selectedPriceOption doesn't match the card price, retry 3 times with 3 seconds delay
+              let retry = 3;
+              while (retry > 0) {
+                const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
+                if (selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') === cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
+                  break;
+                }
+                await page.waitForTimeout(3000);
+                retry--;
+              }
+
               const selectedPriceOption = await modal.selectedPriceOption.first().textContent();
               console.log(`  │  │     Selected: ${selectedPriceOption}`);
+
               if (CHECK_SELECTED_PRICE_MATCH && selectedPriceOption.split('/')[0].replace(/[^\d]/g, '') !== cardPrice.split('/')[0].replace(/[^\d]/g, '')) {
                 cardResult.error = `Selected price option ${selectedPriceOption} does not match card price ${cardPrice} for tab \"${tabTitle}\" card \"${productName}\"`;
                 console.log(`  │  │     ✗ ERROR: ${cardResult.error}`);
