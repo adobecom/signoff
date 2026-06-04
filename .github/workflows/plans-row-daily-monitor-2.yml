@@ -428,15 +428,7 @@ jobs:
           command: npm ci
 
       - name: Run plans ROW monitor
-        run: |
-          LOCALE="${{ matrix.locale }}"
-          MILO_LOCALES="fr br ca be_fr be_en be_nl ca_fr ch_fr lu_fr lu_de lu_en"
-          if echo " $MILO_LOCALES " | grep -q " $LOCALE "; then
-            SPEC="plans/monitor_row_milo.spec.js"
-          else
-            SPEC="plans/monitor_row2.spec.js"
-          fi
-          npx playwright test "$SPEC" --project=chromium
+        run: npx playwright test plans/monitor_row_milo.spec.js --project=chromium
         env:
           TEST_TABS: ${{ inputs.test_tabs }}
           # TEMP: Business tab (index 1) alerts disabled ~2026-04-21, re-enable in ~1 week
