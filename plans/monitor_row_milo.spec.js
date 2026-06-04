@@ -96,8 +96,14 @@ async function gobackTabModal(page,url, tab, merchCard) {
   } catch (err) {
     console.log(`Resetting browser context: ${err.message}`);
   }
-  await page.waitForTimeout(2000);
-  await tab.click({ timeout: 10000 });
+  try {
+    await tab.waitFor({ state: 'visible', timeout: 30000 });
+    await tab.click({ timeout: 10000 });
+  } catch (error) {
+    await page.screenshot({ path: 'screenshots/back-to-modal-exception.png' });
+    console.log(`❌ Tab not found: ${error.message}`);
+  }
+
   if (merchCard) {
     await merchCard.card.waitFor({ state: 'visible', timeout: 10000 });
     await merchCard.checkoutLink.first().click({ timeout: 10000 });
