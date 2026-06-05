@@ -697,7 +697,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 normalizedCardPrice = normalizedCardPrice.replace(/[^\d.]/g, '');
               }
               // 33,49 €kuus vs 33,49 € kuus
-              if (['lt', 'ee'].includes(countryCode)) {
+              if (['lt', 'ee', 'lv'].includes(countryCode)) {
                 normalizedCardPrice = normalizedCardPrice.split('€')[0];
               }
               normalizedCardPrice = normalizedCardPrice.replace('Alternatively at ', '');
