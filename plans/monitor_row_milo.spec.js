@@ -696,6 +696,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               if (countryCode === 'il_he') {
                 normalizedCardPrice = normalizedCardPrice.replace(/[^\d.]/g, '');
               }
+              normalizedCardPrice = normalizedCardPrice.replace('Alternatively at ', '');
               if (redirectedPageContent.includes(normalizedCardPrice)) {
                 console.log(`  │  │     ✓ Card price found in redirected page`);
               } else {
