@@ -696,6 +696,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               if (countryCode === 'il_he') {
                 normalizedCardPrice = normalizedCardPrice.replace(/[^\d.]/g, '');
               }
+              // 33,49 €kuus vs 33,49 € kuus
+              if (countryCode === 'ee') {
+                normalizedCardPrice = normalizedCardPrice.split('€')[0];
+              }
               normalizedCardPrice = normalizedCardPrice.replace('Alternatively at ', '');
               if (redirectedPageContent.includes(normalizedCardPrice)) {
                 console.log(`  │  │     ✓ Card price found in redirected page`);
