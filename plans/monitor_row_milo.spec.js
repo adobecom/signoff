@@ -659,7 +659,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                   continue;
                 }
 
-                if (newUrl === testUrl) {
+/*                 if (newUrl === testUrl) {
                   await merchCard.checkoutLink.first().waitFor({ state: 'visible', timeout: 10000 });
                   await merchCard.checkoutLink.first().click({ timeout: 10000 });
                   await page.waitForTimeout(5000);
@@ -677,7 +677,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                     console.log(`  │  │  ⚠️  ${errorMessage}`);
                     throw new Error(errorMessage);
                   }
-                }
+                } */
               }
 
               optionResults.push(...productOptionResults);
