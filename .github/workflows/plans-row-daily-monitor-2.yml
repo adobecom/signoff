@@ -570,7 +570,7 @@ jobs:
         if: failure() && steps.process-errors.outputs.HAS_CSO_FAILURE == 'true' && contains(fromJson('["uk","de","fr","jp"]'), matrix.locale)
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: 'acom-commerce-alerts'
+          SLACK_CHANNEL: 'loot-loaders-tests'
           SLACK_COLOR: '#FF0000'
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: 🚨 CSO Alert - Plans ROW Monitor
@@ -618,7 +618,7 @@ jobs:
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: ${{ steps.check-faulty.outputs.is_faulty == 'true' && 'loot-loaders-tests' || (github.event_name == 'schedule' && 'acom-commerce-alerts' || inputs.slack_channel_failed || 'loot-loaders-tests') }}
+          SLACK_CHANNEL: ${{ inputs.slack_channel_failed || 'loot-loaders-tests' }}
           SLACK_COLOR: danger
           SLACK_ICON: https://github.com/actions.png?size=48
           SLACK_USERNAME: Plans ROW Monitor 2
@@ -687,4 +687,4 @@ jobs:
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/analyze-logs.yml/dispatches \
-            -d "{\"ref\":\"${{ github.ref_name }}\",\"inputs\":{\"run_url\":\"${RUN_URL}\",\"jira_issue_key\":\"\",\"jira_project\":\"${{ steps.jira-routing.outputs.project }}\",\"jira_assignee\":\"${{ steps.jira-routing.outputs.assignee }}\",\"jira_cc\":\"${{ steps.jira-routing.outputs.cc }}\",\"jira_team\":\"${{ steps.jira-routing.outputs.team }}\",\"slack_channel_jira\":\"#acom-commerce-alerts\",\"slack_channel_alert\":\"#acom-commerce-alerts\"}}"
+            -d "{\"ref\":\"${{ github.ref_name }}\",\"inputs\":{\"run_url\":\"${RUN_URL}\",\"jira_issue_key\":\"\",\"jira_project\":\"${{ steps.jira-routing.outputs.project }}\",\"jira_assignee\":\"${{ steps.jira-routing.outputs.assignee }}\",\"jira_cc\":\"${{ steps.jira-routing.outputs.cc }}\",\"jira_team\":\"${{ steps.jira-routing.outputs.team }}\",\"slack_channel_jira\":\"#loot-loaders-tests\",\"slack_channel_alert\":\"#loot-loaders-tests\"}}"
