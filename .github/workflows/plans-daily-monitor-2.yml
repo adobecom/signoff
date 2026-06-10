@@ -179,7 +179,7 @@ jobs:
         if: failure() && steps.process-errors.outputs.HAS_CSO_FAILURE == 'true'
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: 'acom-commerce-alerts'
+          SLACK_CHANNEL: 'loot-loaders-tests'
           # CSO alerts always go to acom-commerce-alerts regardless of faulty mode
           SLACK_COLOR: '#FF0000'
           SLACK_ICON: https://github.com/actions.png?size=48

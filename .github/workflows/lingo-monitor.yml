@@ -140,7 +140,7 @@ jobs:
           curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "channel": "#acom-commerce-alerts",
+              "channel": "#loot-loaders-tests",
               "username": "Lingo Monitor",
               "icon_url": "https://github.com/actions.png?size=48",
               "attachments": [{
