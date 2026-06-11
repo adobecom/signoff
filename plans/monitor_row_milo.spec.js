@@ -34,7 +34,7 @@ class MerchCard {
     this.card = card;
     this.productName = card.locator('h3');
     this.price = card.locator('span[is="inline-price"][data-template="price"] .price:not(.price-strikethrough)').filter({visible: true});
-    this.checkoutLink = card.locator('a[is="checkout-link"]');
+    this.checkoutLink = card.locator('div[slot="footer"] a[is="checkout-link"]');
   }
 }
 
@@ -256,20 +256,6 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
       if (process.env.SKIP_TAB && parseInt(process.env.SKIP_TAB) === i) {
         console.log(`Skipping tab ${i} as SKIP_TAB is set to ${process.env.SKIP_TAB}`);
         continue;
-      }
-      // For JP, use a specialized testUrl for tab 0
-      if (countryCode === 'jp') {
-        if (i === 0) {
-          testUrl = testUrl + '?plan=individual&filter=all';
-        } else {
-          testUrl = origTestUrl;
-        }
-        console.log(`JP Test URL: ${testUrl}`);
-        const currUrl = await page.url();
-        if (currUrl !== testUrl) {
-          await page.goto(testUrl);
-          await page.waitForTimeout(3000);
-        }
       }
 
       const tab = tabs[i];
