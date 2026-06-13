@@ -74,13 +74,15 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/uk/creativecloud/business/teams.html';
   console.log('\n' + '='.repeat(80));
-  console.log('🔍 TESTING URL:', testUrl);
-  
+  console.log('🎯 TEST CONFIGURATION');
+  console.log('='.repeat(80));
+  console.log(`URL: ${testUrl}`);
+  console.log('='.repeat(80) + '\n');
+
   // Extract country code from URL path (e.g., /uk/ -> 'uk')
   const urlPath = new URL(testUrl).pathname;
   const countryCode = urlPath.split('/').filter(Boolean)[0] || 'uk';
   console.log('🌍 MOCKING GEO LOCATION:', countryCode);
-  console.log('='.repeat(80) + '\n');
 
   test.beforeEach(async ({ page }) => {
     await page.route('https://client.messaging.adobe.com/**', route => route.abort());

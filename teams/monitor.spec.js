@@ -44,7 +44,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   const testUrl = process.env.TEST_URL || 'https://www.adobe.com/creativecloud/business/teams.html';
   console.log('\n' + '='.repeat(80));
-  console.log('🔍 TESTING URL:', testUrl);
+  console.log('🎯 TEST CONFIGURATION');
+  console.log('='.repeat(80));
+  console.log(`URL: ${testUrl}`);
   console.log('='.repeat(80) + '\n');
 
   test.beforeEach(async ({ page }) => {
