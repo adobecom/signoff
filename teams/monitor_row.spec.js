@@ -433,7 +433,7 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
         await option.click();
         await page.waitForTimeout(1000);
         
-        expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
+        await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});
         await modal.continueButton.first().click();
         await page.waitForTimeout(5000);
 
