@@ -374,7 +374,7 @@ jobs:
 
             const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
             const payload = {
-              channel: '#acom-commerce-alerts',
+              channel: '#loot-loaders-tests',
               username: 'PA Core Monitor',
               icon_url: 'https://github.com/actions.png?size=48',
               attachments: [
