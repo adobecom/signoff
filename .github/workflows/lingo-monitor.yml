@@ -291,7 +291,7 @@ jobs:
           " >> "$GITHUB_OUTPUT"
 
       - name: Dispatch log analysis workflow
-        if: steps.should-run.outputs.skip != 'true' && failure()
+        if: false
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
