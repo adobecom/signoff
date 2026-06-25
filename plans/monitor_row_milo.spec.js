@@ -122,7 +122,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
 
   // Extract country code from URL path (e.g., /uk/ -> 'uk')
   const urlPath = new URL(testUrl).pathname;
-  const countryCode = urlPath.split('/').filter(Boolean)[0] || 'uk';
+  const firstSegment = urlPath.split('/').filter(Boolean)[0] || '';
+  const countryCode = /^[a-z]{2}(_[a-z]{2})?$/.test(firstSegment) ? firstSegment : 'us';
   console.log('🌍 MOCKING GEO LOCATION:', countryCode);
 
   test.beforeEach(async ({ page }) => {
