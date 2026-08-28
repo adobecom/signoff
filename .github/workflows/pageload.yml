@@ -107,10 +107,7 @@ jobs:
   run-tests-selfhosted:
     if: ${{ github.event.inputs.environment == 'stage' }}
     name: Smoke Test
-    runs-on: [self-hosted, Linux, X64]
-    defaults:
-      run:
-        shell: bash --login -eo pipefail {0}    
+    runs-on: [self-hosted, Linux, X64, repo] 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
