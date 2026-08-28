@@ -214,7 +214,7 @@ jobs:
     if: ${{ needs.filter-matrix.outputs.has_tests == 'true' }}
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.56.0-noble
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.filter-matrix.outputs.matrix) }}

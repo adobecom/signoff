@@ -156,7 +156,7 @@ jobs:
     if: needs.setup.outputs.pause_skip != 'true'
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.56.0-noble
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
     strategy:
       fail-fast: false  # all locales run even if one fails
       matrix:
