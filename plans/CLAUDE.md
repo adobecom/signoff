@@ -13,24 +13,22 @@ The `/plans` folder contains specialized monitoring scripts for Adobe Creative C
 - Platform: **Milo** (uses `div#page-load-ok-milo`)
 - Workflow: `plans-daily-monitor.yml`
 
-### 2. monitor_row2.spec.js — ROW (Dexter locales)
-- Tests ROW locales hosted on the **Dexter** platform
-- Uses Dexter selectors (e.g. `div.evidon-notice-link`, `plans-card`)
-- Workflow: `plans-row-daily-monitor-2.yml`
-- Scheduled locales: `uk`, `jp`, `de`, `es`, `it`, `in`
+### 2. monitor_row_milo.spec.js — ROW (Milo)
+- Tests all ROW locales hosted on the **Milo** platform
 - All supported locales (manual dispatch):
   `ae_ar`, `ae_en`, `africa`, `ar`, `at`, `au`,
   `bg`,
-  `ch_de`, `ch_it`, `cl`, `cn`, `co`, `cr`, `cz`,
+  `be_en`, `be_fr`, `be_nl`, `br`,
+  `ca`, `ca_fr`, `ch_de`, `ch_fr`, `ch_it`, `cl`, `cn`, `co`, `cr`, `cz`,
   `de`, `dk`,
   `ec`, `ee`, `eg_ar`, `eg_en`, `es`,
-  `fi`,
+  `fi`, `fr`,
   `gr_el`, `gr_en`, `gt`,
   `hk_en`, `hk_zh`, `hu`,
   `id_en`, `id_id`, `ie`, `il_en`, `il_he`, `in`, `in_hi`, `it`,
   `jp`,
   `kr`, `kw_ar`, `kw_en`,
-  `la`, `lt`, `lv`,
+  `la`, `lt`, `lu_de`, `lu_en`, `lu_fr`, `lv`,
   `mena_ar`, `mena_en`, `mx`, `my_en`, `my_ms`,
   `ng`, `nl`, `no`, `nz`,
   `pe`, `ph_en`, `ph_fil`, `pl`, `pr`, `pt`,
@@ -41,17 +39,12 @@ The `/plans` folder contains specialized monitoring scripts for Adobe Creative C
   `ua`, `uk`,
   `vn_en`, `vn_vi`,
   `za`
-
-### 3. monitor_row_milo.spec.js — ROW (Milo locales)
-- Tests ROW locales hosted on the **Milo** platform
-- Locales: `fr`, `br`, `ca`, `be_fr`, `be_en`, `be_nl`, `ca_fr`, `ch_fr`, `lu_fr`, `lu_de`, `lu_en`
 - Uses Milo selectors (e.g. `div#page-load-ok-milo`, `merch-card`)
 - Workflow: `plans-row-daily-monitor-milo.yml`
 
 ## Development Commands
 
 - `npx playwright test plans/monitor.spec.js` - Run the US monitoring script
-- `npx playwright test plans/monitor_row2.spec.js` - Run the ROW Dexter script
 - `npx playwright test plans/monitor_row_milo.spec.js` - Run the ROW Milo script
 - Add `--headed` for visual debugging, `--workers 1` for detailed single-run debugging
 
