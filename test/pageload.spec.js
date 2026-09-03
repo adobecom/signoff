@@ -126,18 +126,45 @@ const testPageLoad = async ({ page }, testInfo) => {
     // Scroll to the bottom slowly to load any dynamic content
     await page.evaluate(async () => {
       const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      const scrollHeight = document.body.scrollHeight;
       const viewportHeight = window.innerHeight;
       const scrollStep = viewportHeight / 2; // Scroll by half viewport height each time
+      let currentPosition = 0;
+      let previousHeight = 0;
+      let stableCount = 0;
+      const maxIterations = 50; // Prevent infinite loops
+      let iterations = 0;
       
-      for (let scrollTop = 0; scrollTop < scrollHeight; scrollTop += scrollStep) {
-        window.scrollTo(0, scrollTop);
-        await delay(500); // Wait 500ms between scrolls
+      while (iterations < maxIterations) {
+        const currentHeight = document.body.scrollHeight;
+        
+        // If height hasn't changed for 2 consecutive checks, we're likely done
+        if (currentHeight === previousHeight) {
+          stableCount++;
+          if (stableCount >= 2) break;
+        } else {
+          stableCount = 0;
+        }
+        
+        // Scroll down by one step
+        currentPosition += scrollStep;
+        window.scrollTo(0, currentPosition);
+        
+        // If we've reached the bottom, scroll to the very end and wait
+        if (currentPosition >= currentHeight - viewportHeight) {
+          window.scrollTo(0, currentHeight);
+          await delay(1000); // Wait longer for final content to load
+          currentPosition = currentHeight;
+        } else {
+          await delay(500); // Wait between scrolls
+        }
+        
+        previousHeight = currentHeight;
+        iterations++;
       }
       
-      // Scroll to the very bottom
-      window.scrollTo(0, scrollHeight);
-      await delay(1000); // Wait a bit longer at the bottom for any final loading
+      // Final scroll to ensure we're at the bottom
+      window.scrollTo(0, document.body.scrollHeight);
+      await delay(1000); // Final wait for any remaining content
     });
 
     // Move viewport back to the top before taking full page screenshot
