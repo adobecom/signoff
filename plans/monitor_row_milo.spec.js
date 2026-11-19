@@ -44,7 +44,7 @@ class Modal {
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
     this.priceOptions = modal.locator(':is(.subscription-panel-offer-price, [class*="CommitmentOptionCard__commitmentOptionCard__"] [data-testid="main-price"])').filter({visible: true});
-    this.selectedPriceOption = modal.locator(':is(input[checked]+label :is(.subscription-panel-offer-price,.subscription-panel-promo-html) [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *), [data-testid="is-selected"] div[data-testid="main-price"])').filter({visible: true});
+    this.selectedPriceOption = modal.locator(':is(input[checked]+label :is(.subscription-panel-offer-price,.subscription-panel-promo-html) [data-wcs-type="price"]:not(i *, [class*="strikethrough"] *), [data-selected="true"] div[data-testid="main-price"])').filter({visible: true});
     this.continueButton = modal.locator(':is(.spectrum-Button--cta, button[data-testid="primary-cta-button"])').filter({visible: true});
     this.modalCloseButton = modal.locator('[data-testid="header-close"]').filter({visible: true});
     this.commerceLink = modal.locator('a[href*="commerce.adobe.com"]').filter({visible: true});
