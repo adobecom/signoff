@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 const TestStateManager = require('./TestStateManager');
+const { snapshotPriceOptions, locatePriceOption } = require('./price-options');
 
 class PlansPage {
   constructor(page) {
@@ -40,7 +41,7 @@ class Modal {
     this.tabs = modal.locator('[role="tab"]').filter({visible: true});
     this.selectedTab = modal.locator('[role="tab"][aria-selected="true"]').first();
     this.priceOptions = modal.locator('div[data-testid="main-price"]').filter({visible: true});
-    this.selectedPriceOption = modal.locator('[data-testid="is-selected"] div[data-testid="main-price"]').filter({visible: true});
+    this.selectedPriceOption = modal.locator('[data-selected="true"] div[data-testid="main-price"]').filter({visible: true});
     this.continueButton = modal.locator('button[data-testid="primary-cta-button"]').filter({visible: true});
     this.modalCloseButton = modal.locator('[data-testid="header-close"]').filter({visible: true});
   }
@@ -352,8 +353,8 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
               console.log(`  │  │     ✓ Price matches card price`);
             }
             
-            const priceOptions = await modal.priceOptions.all();
-            const priceOptionTexts = await Promise.all(priceOptions.map(async(x) => await x.textContent()));
+            const priceOptions = await snapshotPriceOptions(modal.priceOptions);
+            const priceOptionTexts = priceOptions.map(option => option.price);
             console.log(`  │  │     Testing ${priceOptions.length} price option${priceOptions.length !== 1 ? 's' : ''}: [${priceOptionTexts.join(', ')}]`);
             
             for (let k = 0; k < priceOptions.length; k++) {
@@ -366,7 +367,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 optionTitle: priceOptionTexts[k],
               };
               
-              const priceOption = priceOptions[k];
+              const priceOption = locatePriceOption(modal.modal, priceOptions[k]);
+              await expect(priceOption).toHaveCount(1, { timeout: 10000 });
+              await expect(priceOption).toHaveText(priceOptionTexts[k], { timeout: 10000 });
               await priceOption.click({ timeout: 15000 });
               await page.waitForTimeout(1000);
               await expect(modal.continueButton.first()).toBeEnabled({timeout: 10000});

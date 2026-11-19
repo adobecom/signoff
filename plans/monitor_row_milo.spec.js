@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 const TestStateManager = require('./TestStateManager');
+const { snapshotPriceOptions, locatePriceOption } = require('./price-options');
 
 // Set to true (or CHECK_SELECTED_PRICE_MATCH=true env var) to enforce that
 // the pre-selected modal price matches the card price shown on the plans page.
@@ -494,10 +495,10 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 console.log(`  │  │     ✓ Price matches card price`);
               }
 
-              const priceOptions = await modal.priceOptions.all();
+              const priceOptions = await snapshotPriceOptions(modal.priceOptions);
               const productOptionResults = [];
 
-              // Collect all option titles before iterating (to detect price changes after cart return)
+              // Keep original prices keyed by plan, even if the modal reorders after cart return.
               for (let k = 0; k < priceOptions.length; k++) {
                 const optionResult = {
                   tabIndex: i,
@@ -505,18 +506,11 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                   cardIndex: j,
                   cardTitle: productName,
                   optionIndex: k,
-                  optionTitle: 'N/A',
+                  optionTitle: priceOptions[k].price,
                   error: []
                 };
                 productOptionResults.push(optionResult);
 
-                const priceOption = priceOptions[k];
-                try {
-                  await priceOption.waitFor({ state: 'visible', timeout: 10000 });
-                  optionResult.optionTitle = await priceOption.textContent();
-                } catch (error) {
-                  optionResult.error.push(`Price not found for ${tabTitle} > ${productName} > Option ${k + 1}`);
-                }
               }
 
               const optionTitles = productOptionResults.map(r => r.optionTitle).join(', ');
@@ -531,8 +525,9 @@ test.describe('Creative Cloud Plans Page Monitoring', () => {
                 }
 
                 const optionResult = productOptionResults[k];
-                const priceOption = priceOptions[k];
+                const priceOption = locatePriceOption(modal.modal, priceOptions[k]);
 
+                await expect(priceOption).toHaveCount(1, { timeout: 10000 });
                 await priceOption.waitFor({ state: 'visible', timeout: 10000 });
                 let priceTextAgain;
 

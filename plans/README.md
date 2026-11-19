@@ -94,6 +94,20 @@ TEST_URL=https://www.adobe.com/uk/creativecloud/plans.html npx playwright-browse
 
 ## Test Features
 
+### Price-option matching
+
+`monitor2.spec.js` and `monitor_row_milo.spec.js` snapshot each option's price
+with its stable commitment-card test ID (or associated input ID for legacy
+labels). Each checkout iteration locates that same plan again, so reordering
+after returning from the cart does not mix up plans or expected prices. Missing
+or ambiguous identities fail explicitly; genuine price changes remain errors.
+
+Run the local reordering regression tests without opening checkout:
+
+```bash
+npx playwright test plans/price-options.spec.js
+```
+
 ### Common Features (Both Tests)
 - Page load verification
 - Critical error detection
